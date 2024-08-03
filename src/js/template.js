@@ -30,11 +30,11 @@ export default {
         let camX = camera.x + halfMap[0] - this.x - (winWid / camera.zoom);
         let camY = camera.y + halfMap[1] - this.y - (winHei / camera.zoom);
         
-        camX = Math.floor(camX * camera.zoom);
-        camY = Math.floor(camY * camera.zoom);
+        camX = Math.floor(-camX * camera.zoom);
+        camY = Math.floor(-camY * camera.zoom);
 
-        this.element.style.left = -camX + 'px';
-        this.element.style.top = -camY + 'px';
+        this.element.style.left = camX + 'px';
+        this.element.style.top = camY + 'px';
         this.element.style.transform = 'scale(' + camera.zoom + ',' + camera.zoom + ')';
     },
 
