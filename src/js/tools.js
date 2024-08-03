@@ -56,8 +56,8 @@ import { htmlspecialchars, testPointInPolygon } from './utils/misc';
 import Bucket from './Bucket';
 import { map } from './utils/math';
 
-import min5fontSheet from '../font/pixel/min 5.png';
-import min5fontInfo from '../font/pixel/min 5.txt';
+import min5fontSheet from '../font/pixel/min5.png';
+import min5fontInfo from '../font/pixel/min5.txt';
 import MiniWindow from './MiniWindow';
 
 const mobile = globals.mobile;
@@ -1400,12 +1400,6 @@ class Paste extends Tool {
             const [x, y] = boardToScreenSpace(xPos, yPos);
             const z = camera.zoom;
 
-            ctx.imageSmoothingEnabled = false;
-            ctx.webkitImageSmoothingEnabled = false;
-            ctx.mozImageSmoothingEnabled = false;
-            ctx.msImageSmoothingEnabled = false;
-            ctx.oImageSmoothingEnabled = false;
-
             const opacity = map(Math.sin(Date.now() / 400), -1, 1, 0.5, 1);
             ctx.globalAlpha = opacity;
 
@@ -1751,7 +1745,6 @@ class Copy extends Tool {
         // }
 
         function mousedown() {
-            console.log({ altPressed })
             if (altPressed) {
                 lassoMode = true;
                 lassoPoints = [[player.x, player.y]];
@@ -2000,7 +1993,7 @@ pixelInfo.on('up', async () => {
     addFX(pinfoFx, 2);
 });
 
-class PixelFont {
+export class PixelFont {
     static defaultVSpacing = 1;
 
     constructor(imagePath, infoPath) {
@@ -2082,6 +2075,10 @@ class PixelFont {
             width: textWidth,
             height: textHeight
         } = this.measureText(text);
+
+        if(textWidth == 0 || textHeight == 0){
+            return null;
+        }
 
         const colorCanvas = document.createElement('canvas');
         const textCanvas = document.createElement('canvas');
