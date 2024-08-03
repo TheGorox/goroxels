@@ -23,8 +23,10 @@ import { init as initTranslate, translate } from './translate';
 import camera from './camera';
 import { Modal } from './Window';
 import { getLS, setLS } from './utils/localStorage';
+import * as indexedDb from './indexedDb';
 
 (async () => {    
+    indexedDb.init();
     await config.download();
 
     const {
@@ -38,13 +40,16 @@ import { getLS, setLS } from './utils/localStorage';
         elements.fxCanvas.width = window.innerWidth;
         elements.fxCanvas.height = window.innerHeight;
 
-        ctx.imageSmoothingEnabled = false;
-        ctx.webkitImageSmoothingEnabled = false;
-        ctx.mozImageSmoothingEnabled = false;
-        ctx.msImageSmoothingEnabled = false;
-        ctx.oImageSmoothingEnabled = false;
+        const fxCtx = elements.fxCanvas.getContext('2d');
+
+        ctx.imageSmoothingEnabled = fxCtx.imageSmoothingEnabled = false;
+        ctx.webkitImageSmoothingEnabled = fxCtx.webkitImageSmoothingEnabled = false;
+        ctx.mozImageSmoothingEnabled = fxCtx.mozImageSmoothingEnabled = false;
+        ctx.msImageSmoothingEnabled = fxCtx.msImageSmoothingEnabled = false;
+        ctx.oImageSmoothingEnabled = fxCtx.oImageSmoothingEnabled = false;
 
         renderer.needRender = true;
+        fxRenderer.needRender = true;
 
         if (!globals.mobile) {
             calculateColumnSize();

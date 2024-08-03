@@ -26,12 +26,6 @@ export class FXRenderer {
         this.fxList = [[], [], []];
         this.ctx = globals.fxCtx;
 
-        this.ctx.imageSmoothingEnabled = false;
-        this.ctx.webkitImageSmoothingEnabled = false;
-        this.ctx.mozImageSmoothingEnabled = false;
-        this.ctx.msImageSmoothingEnabled = false;
-        this.ctx.oImageSmoothingEnabled = false;
-
         this.needRender = true;
         this.needClear = false;
     }
