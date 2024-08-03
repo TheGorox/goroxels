@@ -11,6 +11,7 @@ import {
 import template from './template';
 import shapes from './utils/shapes';
 import player from './player';
+import TempChunkPlaceholder from './TempChunkPlaceholder';
 
 const isMobile = insanelyLongMobileBrowserCheck();
 
@@ -28,6 +29,7 @@ export default class Renderer {
         this.chunkPlaceholderPattern.onload = () => {
             this.needRender = true;
         }
+        this.chunkPreviews = {};
 
         this.needRender = true;
 
@@ -180,9 +182,36 @@ export default class Renderer {
 
             if (!globals.chunkManager.hasChunk(cx, cy)){
                 globals.chunkManager.loadChunk(cx, cy);
-                
-                if(this.chunkPlaceholderPattern.loaded)
-                    this.ctx.drawImage(this.chunkPlaceholderPattern.canvas, offX, offY, chunkSize, chunkSize);
+
+                // search for chunk preview placeholder
+                let chunkPreview = this.chunkPreviews[`${cx}-${cy}`];
+                if(!chunkPreview){
+                    // create one if not found (one-time op)
+                    chunkPreview = this.chunkPreviews[`${cx}-${cy}`] = {
+                        loaded: false,
+                        data: null
+                    };
+                    new TempChunkPlaceholder(cx, cy).load().then(imgData => {
+                        chunkPreview.data = imgData;
+                        chunkPreview.loaded = true;
+                        this.needRender = true;
+                    });
+                }else if (chunkPreview.loaded && chunkPreview.data !== null){
+                    // or, render it if it's loaded and found in db
+                    this.ctx.drawImage(chunkPreview.data, offX, offY, chunkSize, chunkSize);
+
+                    // also render default placeholder over it, to clarify we are dealing with preview
+                    if(this.chunkPlaceholderPattern.loaded){
+                        this.ctx.globalAlpha = 0.5;
+                        this.ctx.drawImage(this.chunkPlaceholderPattern.canvas, offX, offY, chunkSize, chunkSize);
+                        this.ctx.globalAlpha = 1;
+                    }
+                }else {
+
+                    // fallback to default placeholder if available
+                    if(this.chunkPlaceholderPattern.loaded)
+                        this.ctx.drawImage(this.chunkPlaceholderPattern.canvas, offX, offY, chunkSize, chunkSize);
+                }
 
                 return
             }
