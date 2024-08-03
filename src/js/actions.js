@@ -42,6 +42,7 @@ import { getPathsafeDate, getRecommendedColorSize } from './utils/misc';
 import { patterns } from './convert/patterns';
 import { isDarkColor } from './utils/color';
 import Chunk from './Chunk';
+import WinampPlayer from './winamp/player';
 
 export async function apiRequest(path, config = {}) {
     // handle json body of request
@@ -59,7 +60,9 @@ export async function apiRequest(path, config = {}) {
 
             if (json.errors) {
                 json.errors.forEach(error => {
-                    toastr.error(error);
+                    toastr.error(error, undefined, {
+                        preventDuplicates: true
+                    });
                 })
             }
 
@@ -502,6 +505,7 @@ export function initOtherCoolFeatures() {
     initOnlineViewer();
     initMenuResizer();
     showHelpIfFirstTime();
+    startWinampRadio();
 }
 
 function initCoordsClick() {
@@ -718,4 +722,11 @@ function showHelpIfFirstTime() {
         setLS('helpShown', '1');
         help();
     }
+}
+
+function startWinampRadio(){
+    const player = new WinampPlayer();
+    player.init();
+
+    window.wPlayer = player;
 }

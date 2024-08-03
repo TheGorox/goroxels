@@ -1,14 +1,15 @@
 // change utils/recorder if changes
 
 export const OPCODES = {
-    chunk:      0x0,
-    place:      0x1,
-    online:     0x2,
-    canvas:     0x3,
-    pixels:     0x4,
-    captcha:    0x5,
-    ping:       0x6,
-    placeBatch: 0x7
+    chunk:       0x0,
+    place:       0x1,
+    online:      0x2,
+    canvas:      0x3,
+    pixels:      0x4,
+    captcha:     0x5,
+    ping:        0x6,
+    placeBatch:  0x7,
+    updateRadio: 0x8
 }
 
 export const STRING_OPCODES = {

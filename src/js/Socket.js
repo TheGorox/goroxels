@@ -267,6 +267,12 @@ export default class Socket extends EventEmitter {
                 }
                 break
             }
+
+            case OPCODES.updateRadio: {
+                const type = dv.getUint8(1);
+                this.emit('radio', type);
+                break
+            }
         }
     }
 

@@ -108,3 +108,36 @@ export function testPointInPolygon(nvert, vertx, verty, testx, testy) {
     }
     return c;
 }
+
+export function resizeCanvas(canvas, newWidth, newHeight) {
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+
+    tempCanvas.width = newWidth;
+    tempCanvas.height = newHeight;
+
+    tempCtx.imageSmoothingEnabled = false;
+    tempCtx.drawImage(canvas, 0, 0, newWidth, newHeight);
+
+    const resizedCanvas = document.createElement('canvas');
+
+    resizedCanvas.width = newWidth;
+    resizedCanvas.height = newHeight;
+
+    const resizedCtx = resizedCanvas.getContext('2d');
+
+    resizedCtx.imageSmoothingEnabled = false;
+    resizedCtx.drawImage(tempCanvas, 0, 0, newWidth, newHeight);
+
+    return resizedCanvas;
+}
+
+export function loadImage(url){
+    return new Promise((res, rej) => {
+        const img = new Image();
+        img.src = url;
+
+        img.onerror = rej;
+        img.onload = () => res(img);
+    })
+}

@@ -12,4 +12,8 @@ export function avrg(...values) {
 
 export function map(value, inputMin, inputMax, outputMin, outputMax) {
     return (value - inputMin) * (outputMax - outputMin) / (inputMax - inputMin) + outputMin;
-  }
+}
+
+export function clamp(value, min, max){
+    return Math.max(Math.min(value, max), min)
+}
