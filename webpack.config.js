@@ -68,9 +68,12 @@ const config = {
             use: [MiniCssExtractPlugin.loader, {
                 loader: 'css-loader',
                 options: {
-                    modules: false
+                    modules: false,
+                    // https://github.com/webpack/webpack-dev-server/issues/1815#issuecomment-1181720815
+                    // url: false
                 }
-            }],
+            }
+            ],
         },
 
         // workaround for converters
@@ -95,7 +98,7 @@ const config = {
     },
     plugins: [
         new MiniCssExtractPlugin({
-            filename: '[name].[contenthash].css'
+            filename: '[name].[contenthash].css',
         }),
         new HtmlWebpackPlugin({
             filename: 'index.html',
@@ -134,7 +137,7 @@ const config = {
                 }
             }
         }
-    },
+    }
 };
 
 module.exports = async env => {
