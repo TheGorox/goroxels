@@ -10,6 +10,7 @@ import {
 } from './utils/conversions'
 import { apiRequest } from './actions';
 import Pako from 'pako';
+import TempChunkPlaceholder from './TempChunkPlaceholder';
 
 export default class ChunkManager {
     constructor() {
@@ -81,6 +82,9 @@ export default class ChunkManager {
 
                 let chunk = new Chunk(x, y, new Uint8Array(cdata));
                 this.chunks.set(key, chunk);
+
+                chunk.render(); // workaround because TempChunkPlaceholder getting zeroes until chunk is rendered once
+                new TempChunkPlaceholder(x, y).save(chunk.canvas);
 
                 globals.renderer.needRender = true;
             });
