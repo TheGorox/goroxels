@@ -218,9 +218,15 @@ export default class ToolManager extends EventEmitter {
                     if (!tool2.key || tool2 === tool)
                         continue;
 
-                    if (strEvKey === tool2.key) {
-                        tool2.emit('up', e)
-                    }
+                    const tool2keyDecoded = decodeKey(tool2.key);
+
+                    if (strEvKey === tool2.key || 
+                        // make up event on single Alt, because after that keyup on the 
+                        // primary key will no longer match the tool key string (i.e. up="V" vs key="ALT+V")
+                        (strEvKey.startsWith('Alt') && tool2keyDecoded.alt) || 
+                        (strEvKey.startsWith('Ctrl') && tool2keyDecoded.ctrl)) {
+                            tool2.emit('up', e)
+                        }
                 }
 
                 if (tool) {
