@@ -8,6 +8,7 @@ export default class Tool extends EventEmitter{
         this.name = name;
         this.icon = iconURL;
 
+        this.defaultKey = defaultKey;
         this.key = defaultKey ? defaultKey.toString() : undefined;
 
         this.requiredRole = minRole;

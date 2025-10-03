@@ -53,21 +53,26 @@ export class FXRenderer {
 
         for (let layer = 0; layer < this.fxList.length; layer++) {
             this.fxList[layer].forEach(fx => {
-                if (fx.removed) return this.remove(fx);
+                try {
+                    if (fx.removed) return this.remove(fx);
 
-                let r = fx.render(this.ctx);
+                    let r = fx.render(this.ctx);
 
-                /*
-                    0 - not finished yet
-                    1 - finished but continue rendering
-                    2 - finished
-                */
+                    /*
+                        0 - not finished yet
+                        1 - finished but continue rendering
+                        2 - finished
+                    */
 
-                if (r == 2) {
-                    this.remove(fx);
-                } else if (r == 0) {
-                    this.needRender = true;
+                    if (r == 2) {
+                        this.remove(fx);
+                    } else if (r == 0) {
+                        this.needRender = true;
+                    }
+                } catch (error) {
+                    console.error(error);
                 }
+
             })
         }
     }
@@ -85,3 +90,25 @@ export class FXRenderer {
 
     }
 }
+
+// fxRenderer is loaded later then tools/template
+// so here is the workaround
+let _deferredFX = [];
+export function addFX(fx, layer) {
+    if (globals.fxRenderer) {
+        globals.fxRenderer.add(fx, layer);
+    } else _deferredFX.push([fx, layer]);
+}
+
+export function removeFX(fx) {
+    globals.fxRenderer.remove(fx);
+}
+let fxi = setInterval(() => {
+    if (globals.fxRenderer) {
+        clearInterval(fxi);
+        for (let [fx, layer] of _deferredFX) {
+            addFX(fx, layer);
+        }
+        _deferredFX = [];
+    }
+}, 5);

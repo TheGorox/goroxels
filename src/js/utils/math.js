@@ -10,7 +10,7 @@ export function avrg(...values) {
     return values.reduce((a, b) => a + b) / values.length
 }
 
-export function map(value, inputMin, inputMax, outputMin, outputMax) {
+export function mapRange(value, inputMin, inputMax, outputMin, outputMax) {
     return (value - inputMin) * (outputMax - outputMin) / (inputMax - inputMin) + outputMin;
 }
 

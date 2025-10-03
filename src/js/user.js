@@ -11,23 +11,24 @@ import me from './me';
 
 // import userImg from '../img/user2.png';
 import userImg from '../img/user.svg'
-import { ROLE } from './constants';
-import { apiRequest } from './actions';
+import { ROLE, ROLE_I } from './constants';
 import IP from './utils/ip';
-import { translate as t_ } from './translate';
+import { translate as t } from './translate';
 
 import modBadge from '../img/mod-badge.svg'
 import adminBadge from '../img/admin-badge.svg'
 import creatorBadge from '../img/creator-badge.svg'
 import { htmlspecialchars } from './utils/misc';
+import { apiRequest } from './utils/api';
 
-// need to find a way for importing links dynamically
-import badge0link from '../img/badges/badge0.png';
-import badge1link from '../img/badges/badge1.png';
-const badgeLinks = [
-    badge0link,
-    badge1link
-]
+// WARNING: this will work only if file names are not changed by webpack
+const requireBadge = require.context('../img/badges', false, /\.png$/);
+const badgeLinks = {};
+requireBadge.keys().map(requireBadge).forEach(path => {
+    const filename = path.default.match(/([\w\d_]+)\.png$/);
+    badgeLinks[filename[1]] = path.default;
+});
+
 
 const usersContainer = $('#usersTable');
 
@@ -37,39 +38,71 @@ export default class User {
     static async CreateWindow(info, tempId) {
         const win = new Window({
             center: true,
-            title: `${info.name || t_('PLAYER') + ' ' + (tempId || info.id)}`
+            title: `${info.name || t('PLAYER') + ' ' + (tempId || info.id)}`
         });
+
+        // show everything by default
+        const htmlInfo = new Map();
+
+        if (info.registered) {
+            htmlInfo.set('name', htmlspecialchars(info.name));
+            htmlInfo.set('mail', htmlspecialchars(info.email));
+
+        }
+
+        htmlInfo.set('id', info.id||tempId);
 
         if (info.ip) {
             if (info.cc && info.cc !== 'XX') {
                 // adds a flag near the ip address
-                info._ip = info.ip;
 
                 const cc = info.cc;
-                info.ip += ` [${cc}]`;
-                info.ip += `<img src="${location.protocol}//www.countryflagicons.com/FLAT/16/${cc}.png" style="margin-bottom:-5px;margin-left:1px;">`;
-
-                delete info['cc'];
+                htmlInfo.set('ip', info.ip + ` [${cc}]`);
+                htmlInfo.set('ip', htmlInfo.get('ip') + `<img src="${location.protocol}//flagcdn.com/h20/${cc.toLowerCase()}.png" style="margin-left:1px;height:13px;">`);
+            } else {
+                htmlInfo.set('ip', info.ip);
             }
         }
 
-        if (info.role !== undefined && me.role === ROLE.ADMIN && me.id !== info.id) {
-            const role = info.role;
-            let str = '';
-            Object.keys(ROLE).forEach(text => {
-                str += `<option ${(text === role) ? 'selected' : ''}>${text}</option>`
-            })
-            info.role = `<select type="role">${str}<select>`
+        htmlInfo.set('role', info.role);
+
+        // allowing role/badge change 
+        if (info.role !== undefined && me.role === ROLE.ADMIN) {
+            if (me.id !== info.id) {
+                const role = info.role;
+                let str = '';
+                Object.keys(ROLE).forEach(text => {
+                    str += `<option ${(text === role) ? 'selected' : ''}>${text}</option>`;
+                })
+                info.role = role ? ROLE[role] : null;
+
+                htmlInfo.set('role', `<select type="role">${str}</select>`);
+            }
+
+            const badges = info.badges || [];
+            requestAnimationFrame(() => {
+                badges.forEach(badge => addBadge(badge.name));
+            });
+
+            let badgesCont = $(`<div class="badgesList"></div><button class="addBadgeBtn" title="Add Badge">+</button>`);
+            htmlInfo.set('badges', badgesCont.map(function () {
+                return this.outerHTML;
+            }).get().join(''));
         }
 
-        let infoArr = Object.keys(info).map(key => [key, info[key]]), misc = [];
-        infoArr = infoArr.filter(x => !x[0].startsWith('_')); // for shit like _ip
+        let infoArr = [...htmlInfo.keys(htmlInfo)].map(key => [key, htmlInfo.get(key)]), misc = [];
+        infoArr = infoArr.filter(([k, v]) => !!v);
 
         if (me.role >= ROLE.MOD) {
             misc = [
-                [`<input class="alertInput">`, `<button class="sendAlert">${t_('Send Alert')}</button>`],
-                [`<button class="banByIp">${t_('Ban by ip')}</button>`]
+                [`<input class="alertInput">`, `<button class="sendAlert">${t('btn.sendAlert')}</button>`],
+                [`<input class="modalInput">`, `<button class="sendModal">${t('btn.sendModal')}</button>`],
+                [`<input type="checkbox" id="${info.id}-shadow-cb" class="shadowCheckbox" ${info.shadowBanned ? 'checked' : ''}>`, `<label for="${info.id}-shadow-cb">${t('label.shadowBanned')}</label>`],
             ];
+            // ip ban is only for guests
+            if (!info.role && me.id !== info.id) {
+                misc.push([`<button class="banByIp">${t('Ban by ip')}</button>`]);
+            }
         }
 
         let together = infoArr.concat(misc);
@@ -92,10 +125,10 @@ export default class User {
             const body = await resp.json();
             if (body.errors) {
                 body.errors.forEach(error => {
-                    toastr.error(error, t_('ERROR'));
+                    toastr.error(error, t('ERROR'));
                 })
             } else {
-                toastr.success(t_('Changed role to') + ' ' + role);
+                toastr.success(t('Changed role to') + ' ' + role);
             }
         })
 
@@ -109,19 +142,79 @@ export default class User {
             globals.socket.sendAlert(tempId, val);
         });
 
+        $('.sendModal', win.body).on('click', () => {
+            const val = $('.modalInput', win.body).val();
+
+            if (val.length == 0) return;
+
+            $('.modalInput', win.body).val('');
+            globals.socket.sendAlert(tempId, val, true);
+        });
+
         $('.banByIp', win.body).on('click', async () => {
-            const ip = info._ip || info.ip;
-            if (!ip) return toastr.error(t_('No ip!'))
+            const ip = info.ip;
+            if (!ip) return toastr.error(t('No ip!'))
 
             const resp = await apiRequest(`/admin/banPlayer?ip=${ip}`);
             const success = (await resp.json()).success;
             if (success)
-                toastr.success(t_('Success'));
+                toastr.success(t('Success'));
         });
+
+        $('.shadowCheckbox', win.body).on('click', async e => {
+            const checked = e.target.checked;
+            const id = info.id;
+
+            const resp = await apiRequest(`/admin/banPlayer/shadow?uid=${id}&banned=${checked}`, { method: 'POST' });
+            const success = (await resp.json()).success;
+            if (success)
+                toastr.success(t('Success'));
+        });
+
+        $('.addBadgeBtn', win.body).on('click', async () => {
+            const subwindow = new Window({
+                title: 'Badges for ' + info.id,
+                x: win.x + win.width + 5,
+                y: win.y
+            });
+            if (!subwindow.created) return;
+
+            subwindow.body.style.display = 'flex';
+            subwindow.body.style.gap = '2px';
+
+            for (const [badgeName, badgeLink] of Object.entries(badgeLinks)) {
+                const badgeImg = $(`<div style="padding: 3px; background: gray; border-radius: 4px; max-width: fit-content;">
+                <img src="${badgeLink}">
+                </div>`);
+                badgeImg.on('click', () => {
+                    apiRequest(`/badges/add?userId=${info.id}&badge=${badgeName}`, { method: 'POST' }).then(async resp => {
+                        if (!(await resp.json()).ok) return;
+
+                        addBadge(badgeName);
+                    });
+                });
+                $(subwindow.body).append(badgeImg);
+            }
+        });
+
+        function addBadge(badgeName) {
+            const badgeHtml = $(`<div class="badge" title="${badgeName}">
+                            <img src="${badgeLinks[badgeName]}" alt="${badgeName}">
+                        </div>`);
+            $('.badgesList', win.body).append(badgeHtml);
+
+            badgeHtml.on('click', () => {
+                apiRequest(`/badges/del?userId=${info.id}&badge=${badgeName}`, { method: 'POST' }).then(async resp => {
+                    if (!(await resp.json()).ok) return;
+
+                    badgeHtml.remove();
+                });
+            });
+        }
     }
 
 
-    constructor(name, id, userId, registered, role, badges) {
+    constructor(name, id, userId, registered, role, badges = null) {
         if (!name) name = 'ID ' + id;
 
         this.name = name;
@@ -141,7 +234,6 @@ export default class User {
         let displayName = globals.chat.parseColors(safeName).replace(/<[^>]*>/g, '');
 
         const roleBadgeProps = this.getRoleBadgeAndTitle();
-        const badgeImagesHtml = this.getAchieveBadgesHtml();
 
         this.element = $(
             `<tr class="tableRow">
@@ -149,7 +241,7 @@ export default class User {
                     ${roleBadgeProps ? `<img src="${roleBadgeProps.icon}" title="${roleBadgeProps.tooltip}" class="roleBadge">` : ''}
                     <button class="userInfoBtn minrole-trusted"><img style="height: 20px" src="${userImg}"></button>
                     <span class="name">${displayName}</span>
-                    <span class="badges">${badgeImagesHtml}</span>
+                    <span class="badges"></span>
                     <span class="xConns"></span>
                 </td>
                 <td></td>
@@ -189,12 +281,31 @@ export default class User {
         me.updateRoleRelatedHtml();
     }
 
-    getAchieveBadgesHtml(){
-        if(!this.badges) return '';
+    async loadBadges() {
+        if (this.userId === null) return;
+
+        const resp = await apiRequest(`/userInfo/badges?id=${this.userId}`);
+        const badges = await resp.json();
+        this.badges = badges;
+    }
+
+    updateBadges() {
+        $('.badges', this.element).append(this.getAchieveBadgesHtml());
+    }
+
+    getAchieveBadgesHtml() {
+        if (!this.badges) return '';
 
         let html = '';
-        for(let badgeId of this.badges){
-            html += `<img src="${badgeLinks[badgeId]}">`
+        for (let badge of this.badges) {
+            const {
+                name, width, height
+            } = badge;
+
+            const customWidth = width ? `width: ${width}px;` : '';
+            const customHeight = height ? `height: ${height}px;` : '';
+
+            html += `<img src="${badgeLinks[name]}" style="${customWidth}${customHeight}">`;
         }
         return html
     }

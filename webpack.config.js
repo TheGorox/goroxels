@@ -18,7 +18,8 @@ const config = {
     entry: {
         game: path.resolve(srcDir, 'js/main.js'),
         converters: path.resolve(srcDir, 'js/convert/main.js'),
-        admin: path.resolve(srcDir, 'js/admin/main.js')
+        admin: path.resolve(srcDir, 'js/admin/main.js'),
+        radio: path.resolve(srcDir, 'js/radio/main.js'),
     },
     output: {
         filename: '[name].[chunkhash].bundle.js',
@@ -117,6 +118,12 @@ const config = {
             template: path.resolve(srcDir, 'html/admin.html'),
             favicon: path.resolve(srcDir, 'favicon.ico'),
             chunks: ['admin']
+        }),
+        new HtmlWebpackPlugin({
+            filename: 'radio.html',
+            template: path.resolve(srcDir, 'html/radio.html'),
+            favicon: path.resolve(srcDir, 'favicon.ico'),
+            chunks: ['radio']
         }),
         new CircularDependencyPlugin(), // optional
         new webpack.ProvidePlugin({

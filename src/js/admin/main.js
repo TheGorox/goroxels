@@ -18,7 +18,7 @@ async function apiRequest(path, args, isPost = false, isBinary = false) {
         method: isPost ? 'POST' : 'GET'
     });
 
-    if(resp.headers.get('Content-Type').startsWith('plain/binary') || isBinary){
+    if (resp.headers.get('Content-Type').startsWith('plain/binary') || isBinary) {
         return await resp.arrayBuffer();
     }
     const json = await resp.json();
@@ -32,9 +32,9 @@ async function apiRequest(path, args, isPost = false, isBinary = false) {
 }
 
 // returns cancelAnimation callback
-function addWaiter(container){
-    const el = 
-    $(`<div class="waitContainer" style="opacity: 0">
+function addWaiter(container) {
+    const el =
+        $(`<div class="waitContainer" style="opacity: 0">
         <div class="waitElement">
             <div class="waitShape"></div>
             <div class="waitShape"></div>
@@ -51,7 +51,7 @@ function addWaiter(container){
         .css('left', rect.left)
         .css('width', rect.width)
         .css('height', rect.height);
-    
+
     setTimeout(() => {
         el.css('opacity', 1);
     })
@@ -61,30 +61,30 @@ function addWaiter(container){
     }
 }
 
-function parseBackupResponse(respAB){
+function parseBackupResponse(respAB) {
     const respUI8 = new Uint8Array(respAB);
 
     let curChar, currentOffset = 0;
-    while(curChar !== 0){
+    while (curChar !== 0) {
         curChar = respUI8[currentOffset++];
-        if(currentOffset > 0xffff){
+        if (currentOffset > 0xffff) {
             throw new Error('Metadata length is too long, aborting');
         }
     }
 
-    const metadataText = new TextDecoder().decode(respUI8.subarray(0, currentOffset-1));
+    const metadataText = new TextDecoder().decode(respUI8.subarray(0, currentOffset - 1));
 
     const metadata = JSON.parse(metadataText);
 
-    const chunkLength = metadata.chunkSize**2;
+    const chunkLength = metadata.chunkSize ** 2;
 
     const chunks = {};
     for (let cx = 0; cx < metadata.width; cx++) {
         for (let cy = 0; cy < metadata.height; cy++) {
             const key = `${cx},${cy}`;
-            const localOffset = chunkLength*(cx+cy*metadata.width)
-            const offset = currentOffset+localOffset;
-            chunks[key] = respUI8.subarray(offset, offset+chunkLength);
+            const localOffset = chunkLength * (cx + cy * metadata.width)
+            const offset = currentOffset + localOffset;
+            chunks[key] = respUI8.subarray(offset, offset + chunkLength);
         }
     }
 
@@ -94,7 +94,7 @@ function parseBackupResponse(respAB){
 }
 
 async function initBackup() {
-    function getCropVals(){
+    function getCropVals() {
         if (!$("#cropCB").is(':checked')) {
             $('#cropXStart,#cropYStart,#cropXEnd,#cropYEnd').removeAttr('placeholder');
             return null
@@ -105,20 +105,20 @@ async function initBackup() {
         let cropXend = $('#cropXEnd').val();
         let cropYend = $('#cropYEnd').val();
 
-        if(!cropXstart.length){
+        if (!cropXstart.length) {
             cropXstart = 0;
             $('#cropXStart').attr('placeholder', cropXstart);
         }
-        if(!cropYstart.length){
+        if (!cropYstart.length) {
             cropYstart = 0;
             $('#cropYStart').attr('placeholder', cropYstart);
         }
 
-        if(!cropXend.length){
+        if (!cropXend.length) {
             cropXend = cropXstart
             $('#cropXEnd').attr('placeholder', cropXend);
         }
-        if(!cropYend.length){
+        if (!cropYend.length) {
             cropYend = cropYstart
             $('#cropYEnd').attr('placeholder', cropYend);
         }
@@ -134,7 +134,7 @@ async function initBackup() {
         }
 
         return {
-            cropXstart, cropXend, 
+            cropXstart, cropXend,
             cropYstart, cropYend
         }
     }
@@ -178,13 +178,13 @@ async function initBackup() {
         let waiterCB = null;
         if (forceUpdate) {
             const canvasCont = $('#bkCanvasWrapper')[0]
-            if(canvasCont)
+            if (canvasCont)
                 waiterCB = addWaiter(canvasCont);
 
             let resp = await apiRequest('admin/backup/getBackup', { canvas, day, time }, false, true);
-            if(!resp) return;
+            if (!resp) return;
 
-            lastData = parseBackupResponse(resp);           
+            lastData = parseBackupResponse(resp);
         }
 
         const timer = Date.now();
@@ -192,7 +192,7 @@ async function initBackup() {
         console.log('renderBackup in ' + (Date.now() - timer));
         createZoomView($('#bkCanvasWrapper>canvas')[0]);
 
-        if(waiterCB){
+        if (waiterCB) {
             waiterCB();
         }
     }
@@ -250,7 +250,7 @@ async function initBackup() {
             for (let y = startY; y < endY; y++) {
                 preY = y * width
                 for (let x = startX; x < endX; x++) {
-                    if(x < 3 && y == 0){
+                    if (x < 3 && y == 0) {
                         console.log({
                             x, y,
                             rdn: rawData[i] & 0x7F,
@@ -348,12 +348,12 @@ async function initBackup() {
         if (!$("#cropCB").is(':checked')) return null;
 
         const vals = getCropVals();
-        if(!vals){
+        if (!vals) {
             return null;
         }
 
         const {
-            cropXstart, cropXend, 
+            cropXstart, cropXend,
             cropYstart, cropYend
         } = vals;
 
@@ -540,45 +540,97 @@ function initOther() {
 
     initApplyMask();
 }
-function initApplyMask(){
+function initApplyMask() {
     const fileInp = $('#protectMaskFile');
     let lastFile;
     fileInp.on('change', e => {
-        if(fileInp[0].files.length){
+        if (fileInp[0].files.length) {
             const file = fileInp[0].files[0];
             lastFile = file;
             $('label[for=protectMaskFile]').text(file.name);
-        }else{
+        } else {
             $('label[for=protectMaskFile]').text('Choose image');
         }
-    })
+    });
 
     $('#submitProtectMask').on('click', async () => {
-        if(!lastFile) return;
+        if (!lastFile) return;
 
-        const x = +$('#protectMaskXOff').val();
-        const y = +$('#protectMaskYOff').val();
-
-        if([x,y].some(n => {
-            return (isNaN(n) || n < 0)
-        })) return;
+        const xOff = +$('#protectMaskXOff').val();
+        const yOff = +$('#protectMaskYOff').val();
+        if ([xOff, yOff].some(n => isNaN(n) || n < 0)) return;
 
         const canvas = $('#pmCanvasSelect').val();
 
-        const fd = new FormData();
-        fd.append('x', x);
-        fd.append('y', y);
-        fd.append('canvas', canvas);
-        fd.append('img', lastFile);
-
-        const resp = await fetch('/api/admin/canvas/applyProtectMask', {
-            method: 'POST',
-            body: fd
+        const img = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = reject;
+                image.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(lastFile);
         });
-        const respJson = await resp.json();
-        respJson?.errors?.forEach(e => toastr.error(e));
-    })
+
+        const tileSize = 500;
+        const tilesX = Math.ceil(img.width / tileSize);
+        const tilesY = Math.ceil(img.height / tileSize);
+        const total = tilesX * tilesY;
+        let done = 0;
+
+        let toast = toastr.info(`Uploading mask... (0 / ${total})`, "Mask Upload", {
+            timeOut: 0,
+            extendedTimeOut: 0,
+            closeButton: true,
+            tapToDismiss: false
+        });
+
+        const canvasEl = document.createElement('canvas');
+        const ctx = canvasEl.getContext('2d');
+
+        for (let ty = 0; ty < tilesY; ty++) {
+            for (let tx = 0; tx < tilesX; tx++) {
+                const sx = tx * tileSize;
+                const sy = ty * tileSize;
+                const w = Math.min(tileSize, img.width - sx);
+                const h = Math.min(tileSize, img.height - sy);
+
+                canvasEl.width = w;
+                canvasEl.height = h;
+                ctx.clearRect(0, 0, w, h);
+                ctx.drawImage(img, sx, sy, w, h, 0, 0, w, h);
+
+                const blob = await new Promise(res => canvasEl.toBlob(res, 'image/png'));
+                const fd = new FormData();
+                fd.append('x', xOff + sx);
+                fd.append('y', yOff + sy);
+                fd.append('canvas', canvas);
+                fd.append('img', blob, `chunk_${tx}_${ty}.png`);
+
+                const resp = await fetch('/api/admin/canvas/applyProtectMask', {
+                    method: 'POST',
+                    body: fd
+                });
+                const respJson = await resp.json();
+                respJson?.errors?.forEach(e => toastr.error(e));
+
+                done++;
+                if (toast && toast.find('.toast-message').length) {
+                    toast.find('.toast-message').text(`Uploading mask... (${done} / ${total})`);
+                }
+            }
+        }
+
+        toast.remove()
+        if (toast && toast.find('.toast-message').length) {
+            toast.find('.toast-message').text(`Upload complete! (${done} / ${total})`);
+        }
+        toastr.success("Protect mask applied successfully");
+    });
 }
+
 
 function initCanvasActions() {
     canvases.forEach((canv, id) => {
@@ -649,17 +701,17 @@ async function loadConfig() {
  * 
  * @param {HTMLCanvasElement} canvas 
  */
-function createZoomView(canvas){
+function createZoomView(canvas) {
     const size = 200;
-    const halfSize = size/2|0;
+    const halfSize = size / 2 | 0;
 
     $('#zoomedCanvasView').remove();
 
     const zoomedViewCanvas = document.createElement('canvas');
     zoomedViewCanvas.id = 'zoomedCanvasView';
     zoomedViewCanvas.width = zoomedViewCanvas.height = size;
-    zoomedViewCanvas.style.cssText = 
-    `border: 1px solid black; \nposition: absolute; \ndisplay: none`
+    zoomedViewCanvas.style.cssText =
+        `border: 1px solid black; \nposition: absolute; \ndisplay: none`
 
     document.body.appendChild(zoomedViewCanvas);
 
@@ -667,8 +719,8 @@ function createZoomView(canvas){
     const origCtx = canvas.getContext('2d');
 
     const rect = canvas.getBoundingClientRect();
-    const canvasSizeDiffX = canvas.width/rect.width;
-    const canvasSizeDiffY = canvas.height/rect.height;
+    const canvasSizeDiffX = canvas.width / rect.width;
+    const canvasSizeDiffY = canvas.height / rect.height;
 
     canvas.addEventListener('mousemove', e => {
         zoomedViewCanvas.style.display = ''
@@ -676,8 +728,8 @@ function createZoomView(canvas){
         const posX = Math.max(e.offsetX, 0);
         const posY = Math.max(e.offsetY, 0);
 
-        const cordX = posX*canvasSizeDiffX;
-        const cordY = posY*canvasSizeDiffY;
+        const cordX = posX * canvasSizeDiffX;
+        const cordY = posY * canvasSizeDiffY;
 
         const leftBound = cordX - halfSize;
         const topBound = cordY - halfSize;
@@ -687,8 +739,8 @@ function createZoomView(canvas){
 
         render(leftBound, topBound, rightBound, bottomBound);
 
-        zoomedViewCanvas.style.left = (e.clientX+10) + 'px';
-        zoomedViewCanvas.style.top = (e.clientY+10) + 'px';
+        zoomedViewCanvas.style.left = (e.clientX + 10) + 'px';
+        zoomedViewCanvas.style.top = (e.clientY + 10) + 'px';
     });
 
     canvas.addEventListener('mouseleave', () => {
@@ -696,8 +748,8 @@ function createZoomView(canvas){
     });
 
 
-    function render(startX, startY, endX, endY){
-        const imdata = origCtx.getImageData(startX, startY, endX-startX, endY-startY);
+    function render(startX, startY, endX, endY) {
+        const imdata = origCtx.getImageData(startX, startY, endX - startX, endY - startY);
         ctx.putImageData(imdata, 0, 0);
     }
 }

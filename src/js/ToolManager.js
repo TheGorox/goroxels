@@ -52,6 +52,8 @@ export default class ToolManager extends EventEmitter {
         this.ctrlDown = false;
         this.altDown = false;
 
+        this.toolChangeBlocked = false;
+
         me.callOnLoaded(this.filterTools.bind(this));
     }
 
@@ -86,23 +88,45 @@ export default class ToolManager extends EventEmitter {
                 el.appendChild(img);
                 toolsEl.appendChild(el); // todo add click choosing etc
 
-                el.addEventListener('pointerdown', choose.bind(this));
+                el.addEventListener('pointerdown', this.selectTool.bind(this, tool));
 
-                function choose() {
-                    let oldTool = document.getElementsByClassName('toolContainer selected')[0]
-                    if (oldTool)
-                        oldTool.className = 'toolContainer';
-
-                    el.classList = ['toolContainer selected'];
-                    this.tool = tool;
-                }
                 if (tool.name === 'mover')
-                    choose.apply(this);
+                    this.selectTool(tool);
             } else {
                 if (player)
                     this._keyBinds[tool.key] = tool;
             }
         })
+    }
+
+    getToolKey(tool) {
+        for (const [key, value] of Object.entries(this.tools)) {
+            if (tool === value) return key;
+        }
+
+        return null;
+    }
+
+    selectTool(tool) {
+        if (this.toolChangeBlocked) return;
+
+        let oldToolEl = document.getElementsByClassName('toolContainer selected')[0]
+        if (oldToolEl)
+            oldToolEl.className = 'toolContainer';
+
+        const toolKey = this.getToolKey(tool);
+        const curToolEl = document.getElementById(`tool_${toolKey}`);
+        curToolEl.classList = ['toolContainer selected'];
+
+        this.tool = tool;
+    }
+
+    blockToolChange() {
+        this.toolChangeBlocked = true;
+    }
+
+    unblockToolChange() {
+        this.toolChangeBlocked = false;
     }
 
     initEvents() {
@@ -147,27 +171,22 @@ export default class ToolManager extends EventEmitter {
                 });
             });
         } else {
-            // TODO все слушатели напрямую к eventManager
-            em.on('mousedown', e => {
-                this.tools.mover.emit('down', e)
-            });
             em.on('mouseup', e => {
-                if (e.button === 2) {
-                    player.switchColor(-1);
-                    player.switchSecondColor(-1);
-                }
-                this.tools.mover.emit('up', e);
+                // if (e.button === 2) {
+                //     player.switchColor(-1);
+                //     player.switchSecondColor(-1);
+                // }
             });
             em.on('mousemove', e => {
-                if (e.buttons === 0 || camera.noMoving) {
-                    updatePlayerCoords(e.clientX, e.clientY);
-                }
+                updatePlayerCoords(e.clientX, e.clientY);
 
                 this.tool.emit('move', e)
                 this.emit('move', e);
             });
 
-            em.on('keydown', e => {
+            const keydown = (e) => {
+                if(globals.lockInputs) return;
+
                 let str = stringifyKeyEvent(e);
                 if (!str) return;
 
@@ -180,13 +199,18 @@ export default class ToolManager extends EventEmitter {
                     // и отписываться при up
                     tool.emit('down', e);
                 }
-            });
+            }
+            em.on('keydown', keydown);
+            em.on('mousedown', keydown);
 
-            em.on('keyup', e => {
-                let str = stringifyKeyEvent(e);
-                if (!str) return;
 
-                const tool = this._keyBinds[str];
+            const keyup = (e) => {
+                if(globals.lockInputs) return;
+
+                let strEvKey = stringifyKeyEvent(e);
+                if (!strEvKey) return;
+
+                const tool = this._keyBinds[strEvKey];
 
                 for (let name of Object.keys(this.tools)) {
                     const tool2 = this.tools[name];
@@ -194,8 +218,7 @@ export default class ToolManager extends EventEmitter {
                     if (!tool2.key || tool2 === tool)
                         continue;
 
-                    const key = decodeKey(tool2.key);
-                    if (key.code === e.code) {
+                    if (strEvKey === tool2.key) {
                         tool2.emit('up', e)
                     }
                 }
@@ -206,7 +229,9 @@ export default class ToolManager extends EventEmitter {
 
                     tool.emit('up', e);
                 }
-            });
+            }
+            em.on('keyup', keyup);
+            em.on('mouseup', keyup);
 
             em.on('wheel', e => {
                 const oldZoom = camera.zoom;
@@ -218,14 +243,14 @@ export default class ToolManager extends EventEmitter {
                 camera.moveTo((dx / oldZoom), (dy / oldZoom));
                 camera.moveTo(-(dx / camera.zoom), -(dy / camera.zoom));
 
-                if(localStorage.getItem('iHaveProblems') === 'yes'){
+                if (localStorage.getItem('iHaveProblems') === 'yes') {
                     camera.x = Math.round(camera.x); camera.y = Math.round(camera.y);
                     globals.renderer.needRender = true;
                 }
             });
         }
 
-        function specKeysHandlers(e){
+        function specKeysHandlers(e) {
             this.ctrlDown = e.ctrlKey;
             this.altDown = e.altKey;
         }
@@ -244,9 +269,11 @@ export default class ToolManager extends EventEmitter {
         });
     }
 
-    changeKey(tool, key) {
-        const oldKey = tool.key;
-        delete this._keyBinds[oldKey];
+    changeKey(tool, key, deleteOld=true) {
+        if(deleteOld){
+            const oldKey = tool.key;
+            delete this._keyBinds[oldKey];
+        }
 
         tool.key = key;
         this._keyBinds[key] = tool
@@ -265,11 +292,27 @@ export default class ToolManager extends EventEmitter {
             return
         }
 
+        // clearing keybinds ahead of time
+        // it's not safe to delete them in for loop
+        this._keyBinds = {};
         let toolname;
         for (let key of Object.keys(newBinds)) {
-            if (toolname = this.findByName(key))
-                this.changeKey(this.tools[toolname], newBinds[key]);
+            if (toolname = this.findByName(key)){
+                this.changeKey(this.tools[toolname], newBinds[key], false);                
+            }
         }
+    }
+
+    saveBinds() {
+        let toSave = {};
+
+        for (const tool of Object.values(tools)) {
+            if (!tool.key) continue;
+
+            toSave[tool.name] = tool.key;
+        }
+
+        setLS('keyBinds', JSON.stringify(toSave));
     }
 
     findByName(name) {
@@ -277,11 +320,11 @@ export default class ToolManager extends EventEmitter {
         return keys.find(key => this.tools[key].name === name)
     }
 
-    initColorBinds(){
+    initColorBinds() {
 
     }
 
-    loadColorBinds(){
+    loadColorBinds() {
 
     }
 }

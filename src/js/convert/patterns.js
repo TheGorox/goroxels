@@ -1,4 +1,4 @@
-const patterns = [
+export const patterns = [
     [
         0, 0, 0, 0, 0, 0, 0,
         0, 1, 0, 1, 0, 1, 0,
@@ -579,7 +579,7 @@ const patterns = [
     
 ];
 
-const defaultPattern = [
+export const defaultPattern = [
     0, 0, 0, 0, 0, 0, 0,
     0, 1, 1, 0, 1, 1, 0,
     0, 1, 1, 1, 1, 1, 0,
@@ -588,8 +588,3 @@ const defaultPattern = [
     0, 0, 0, 1, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0,
 ];
-
-module.exports = {
-    patterns,
-    defaultPattern
-}

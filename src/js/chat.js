@@ -1,5 +1,5 @@
-import { canvasName, game } from './config';
-import { chatInput } from './elements';
+import { canvasName, downloaded, game, resolveWhenConfigDownloaded } from './config';
+import { chat as chatEl, chatInput } from './ui/elements';
 import globals from './globals';
 import { translate as t_ } from './translate';
 import cssColors from './utils/cssColorsList'
@@ -20,8 +20,9 @@ function pad(pad, str, padLeft) {
 }
 
 const colorRegEx = new RegExp(/\[(#?[A-Z0-9]{1,8})*?\]/gi);
-                          // https : / / host.com/img .png       ? q=321123
+// https : / / host.com/img .png       ? q=321123
 const imgRegEx = new RegExp(/http?s:\/\/.+?\.(png|jpg|jpeg|gif)(\?\S+)?/i);
+const goroxelsLinkRegEx = new RegExp(`^https?://${location.host}/.*`);
 
 class Chat {
     constructor() {
@@ -38,10 +39,10 @@ class Chat {
         this.initChatEvents();
     }
 
-    loadChannelElements(){
+    loadChannelElements() {
         [...$('#chatLog').children()].map(el => {
             let channel = el.dataset.channel;
-            if(channel === 'local'){
+            if (channel === 'local') {
                 channel = canvasName;
             }
             this.logElems[channel] = $(el);
@@ -112,28 +113,37 @@ class Chat {
         if (matching) {
             let src = matching[0];
             str = str.replace(src,
-                `<span class="imageLink" onclick="globals.chat.toggleImage(this)">${src}</span>`) 
+                `<span class="imageLink" onclick="globals.chat.toggleImage(this)">${src}</span>`)
         }
 
         return str
     }
-    toggleImage(target){
+    toggleImage(target) {
         const element = $(target);
         const parent = element.parent();
 
         const exists = !!$('img', parent).length;
-        if(exists){
+        if (exists) {
             $('.imageLink', parent).css('cursor', 'zoom-in')
             $('img', parent).remove();
-        }else{
+        } else {
             $('.imageLink', parent).css('cursor', 'zoom-out');
             const img = $(`<img src="${element.text()}" class="chatImg" onclick="globals.chat.toggleImage(this)">`);
             img.on('load', this.scroll.bind(this, this.channel));
             parent.append(img);
         }
     }
+    parseGoroxelsLink(text) {
+        const firstArg = text.split(' ')[0];
+        if (!firstArg) return text;
 
-    parseBB(str){
+        const match = text.match(goroxelsLinkRegEx);
+        if (!match) return text;
+
+        return text.replace(match[0], `<a href="${match[0]}">${match[0]}</a>`);
+    }
+
+    parseBB(str) {
         // function does not checks for brackets order validity
         let openedTags = [];
 
@@ -148,14 +158,14 @@ class Chat {
             let tag = entry[1];
             str = str.replace(entry[0],
                 `<${tag}>`);
-            if(!tag.startsWith('/'))
+            if (!tag.startsWith('/'))
                 openedTags.push(tag);
-            else{
+            else {
                 openedTags = openedTags.splice(openedTags.indexOf(tag.slice(1)));
             }
         }
 
-        while(openedTags.length){
+        while (openedTags.length) {
             str += `</${openedTags.shift()}>`
         }
 
@@ -164,6 +174,7 @@ class Chat {
 
     addMessage(message) {
         $('.showChat').addClass('showChat-notify');
+        $('.chatNotif').addClass('active');
 
         const channel = message.ch;
 
@@ -179,14 +190,15 @@ class Chat {
             nick = `<span style="text-shadow:0 0 3px">[#00f986]${nick}</span>`
         }
 
-        try{
+        try {
             text = this.parseColors(text);
             text = this.parseBB(text);
             text = this.parseCoords(text);
+            text = this.parseGoroxelsLink(text);
             text = this.parseImage(text);
-    
+
             nick = this.parseColors(nick);
-        }catch(e){
+        } catch (e) {
             console.log(e);
         }
 
@@ -213,6 +225,7 @@ class Chat {
         text = this.parseColors(text);
         text = this.parseBB(text);
         text = this.parseCoords(text);
+        text = this.parseGoroxelsLink(text);
         text = this.parseImage(text);
 
         const msgEl = $(
@@ -225,17 +238,19 @@ class Chat {
         this.afterAddingMessage(channel);
     }
 
-    switchChannel(channel){
-        if(this.channel === channel){
+
+
+    switchChannel(channel) {
+        if (this.channel === channel) {
             return;
         }
 
         const channelAlias = channel;
-        if(channel === 'local'){
+        if (channel === 'local') {
             channel = canvasName;
         }
 
-        for(let ch of Object.values(this.logElems)){
+        for (let ch of Object.values(this.logElems)) {
             ch.hide();
         }
         this.logElems[channel].show();
@@ -264,11 +279,16 @@ class Chat {
     handleMessage(message) {
         if (message.startsWith('/')) {
             this.handleCommand(message);
-        } else
-        globals.socket.sendChatMessage(message, this.channel);
+        } else {
+            if (!globals.socket.connected) {
+                chatInput.val(message);
+                return;
+            }
+            globals.socket.sendChatMessage(message, this.channel);
+        }
     }
 
-    sendWhisper(target, message){
+    sendWhisper(target, message) {
         globals.socket.sendChatWhisper(message, this.channel, target);
     }
 
@@ -279,9 +299,7 @@ class Chat {
         const cmd = args[0];
         args = args.slice(1);
 
-        console.log(args);
-
-        switch(cmd){
+        switch (cmd) {
             case '/mute': {
                 const nick = args.join(' ');
                 this.mute(nick);
@@ -295,16 +313,27 @@ class Chat {
                 break
             }
             case '/w': {
-                if(args.length < 2){
+                if (args.length < 2) {
                     return this.addLocalMessage('Usage: /w &lt;targetAccountId&gt; &lt;message&gt;');
                 }
                 const id = args[0];
                 const msg = args.slice(1).join(' ');
 
-                this.sendWhisper(id, msg);
-                chatInput.val(`/w ${id} `);
+                if (globals.socket.connected) {
+                    this.sendWhisper(id, msg);
+                    this.addLocalMessage(`${t_('chat.you')} -> id${id}: <i>${msg}</i>`, this.channel);
+                    chatInput.val(`/w ${id} `);
+                }
 
                 break
+            }
+            case '/help': {
+                const commands =
+                    `/mute ${t_('chat.muteDesc')}<br>` +
+                    `/unmute ${t_('chat.unmuteDesc')}<br>` +
+                    `/w ${t_('chat.wDesc')}`;
+
+                this.addLocalMessage(commands, this.channel);
             }
         }
     }
@@ -352,7 +381,7 @@ class Chat {
     initChatEvents() {
         chatInput.on('input', () => {
             const value = chatInput.val();
-            if (imgRegEx.test(value)) {
+            if (imgRegEx.test(value) || goroxelsLinkRegEx.test(value)) {
                 chatInput.css('color', 'white');
             } else {
                 chatInput.css('color', '');
@@ -361,16 +390,119 @@ class Chat {
     }
 
     // this function scrolls only if player scrolled chat log to the end
-    scroll(channel='global', force=false){
+    scroll(channel = 'global', force = false) {
         const el$ = this.logElems[channel];
         const el = el$.parent()[0];
         const lastElemHeight = el$.children().slice(-1).innerHeight() || 0;
         // 2 is message margin and 5 is just for fun
-        const scrolled = (el.scrollHeight - el.scrollTop - el.clientHeight - lastElemHeight) <= 2+5;
-        if(scrolled || force){
+        const scrolled = (el.scrollHeight - el.scrollTop - el.clientHeight - lastElemHeight) <= 2 + 5;
+        if (scrolled || force) {
             el.scrollBy(0, 999);
         }
     }
 }
 
-export default globals.chat = new Chat();
+const chat = new Chat();
+
+export function initChat() {
+    $(document).on('keydown', e => {
+        if(globals.lockInputs) return;
+        if (e.key !== 'Enter') return;
+
+        if ($('#chatInput').is(':focus') || globals.mobile) {
+            // send if focused
+            const message = chatInput.val();
+            if (!message.length)
+                return chatInput.trigger('blur');
+
+            chatInput.val('');
+
+            chat.handleMessage(message);
+        } else {
+            // or focus if not
+            $('#chatInput').trigger('focus');
+        }
+    });
+
+    $('#chatChannels>div').on('click', (e) => {
+        const ch = e.target.dataset.channel;
+        chat.switchChannel(ch);
+        setLS('chatChannel', ch);
+    });
+
+    resolveWhenConfigDownloaded().then(() => {
+        chat.loadChannelElements();
+        chat.switchChannel(getLS('chatChannel') || 'global');
+    })
+
+    initChatHeightWorkaround();
+}
+
+
+
+export function toggleChat() {
+    $('.chatNotif').removeClass('active');
+
+    if (chatEl.css('display') === 'none') {
+        chatEl.show();
+        chatEl.css('left', '');
+
+        $('.chatNotif').hide();
+    } else {
+        chatEl.css('left', -chatEl.width() - 30);
+        setTimeout(() => chatEl.hide(), 500);
+
+        $('.chatNotif').show();
+    }
+}
+
+export function initMobileChatToggle() {
+    $('.showChat').on('click', () => {
+        $('.showChat').removeClass('showChat-notify');
+        chat.mobileShow()
+    });
+    $('#hideChat').on('click', () => {
+        $('.showChat').removeClass('showChat-notify');
+        chat.mobileHide()
+    });
+}
+
+function initChatHeightWorkaround() {
+    // -webkit-fill-available does not work since
+    // the best way to define height that i know 
+    // for the moment is through the script
+
+    function fixChatHeight() {
+        document.documentElement.style.setProperty('--gorox-chat-height', $(window).height() + 'px');
+    }
+
+    $(window).on('resize', fixChatHeight);
+    fixChatHeight();
+}
+
+export function fixChatPosition() {
+    const paletteHeight = $('#palette').innerHeight();
+    $('#chat').css('bottom', paletteHeight + 4);
+}
+
+export function toggleEmojis(state) {
+    state ? $('#emotions').show() : $('#emotions').hide();
+}
+
+export function updateEmojis(list) {
+    const container = $('#emotions');
+    let html = '';
+
+    for (let el of list) {
+        html += `<div class="emotion">${el}</div>`;
+    }
+
+    container.html(html);
+
+    $('div', container).on('click', e => {
+        $('#chatInput')[0].value += e.target.innerText;
+        $('#chatInput').trigger('focus');
+    })
+}
+
+export default globals.chat = chat;

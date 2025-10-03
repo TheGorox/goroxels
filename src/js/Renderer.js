@@ -223,7 +223,6 @@ export default class Renderer {
         });
 
         this.ctx.restore();
-
-        template.render()
     }
 }
+

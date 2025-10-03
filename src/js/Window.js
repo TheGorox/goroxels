@@ -2,76 +2,25 @@
 // copyright GOROX
 
 import jQuery from 'jquery';
-import trashSVG from '../img/trash2.svg'
 import closeSVG from '../img/cross.svg'
-
-const deleteEl = document.createElement('div'); // элемент для удаления окон
-deleteEl.style.cssText =
-    `
-    width: 80px;
-    height: 80px;
-    line-height: 80px;
-    text-align: center;
-    border: solid 2px white;
-    border-radius: 50%;
-    opacity: .5;
-    position: absolute;
-    z-index: 8;
-    bottom: 10px;
-    right: 10px;
-    background-color: red;
-    color: white;
-    font-size: 68px;
-    padding-left: 3px; /* костыль из-за кривой иконки мусорки */
-    display: none;
-    user-select: none;
-    transition: all .2s ease;
-    background-image: url(${trashSVG});
-`;
-
-let deleteRange = document.createElement('div');
-deleteRange.style.cssText =
-    `
-    opacity: .1;
-    width: 300px;
-    height: 300px;
-    position: absolute;
-    border-radius: 50%;
-    z-index: 7;
-    bottom: -100px;
-    right: -100px;
-    background-color: red;
-    display: none;
-`
-
-deleteEl.onpointerenter = deleteRange.onpointerenter = () => {
-    deleteEl.style.opacity = '1';
-};
-
-deleteEl.onpointerleave = deleteRange.onpointerleave = () => {
-    deleteEl.style.opacity = '.5';
-};
-
-// disabled due new way to close
-// document.body.appendChild(deleteEl);
-// document.body.appendChild(deleteRange);
+import { translate as t } from './translate';
 
 let windows = [];
 window.windows = windows;
 
 export default class Window {
-    static Exists(title){
+    static Exists(title) {
         return windows.some(x => x.title === title)
     }
-    static Find(title){
+    static Find(title) {
         return windows.find(x => x.title === title)
     }
     constructor(config) {
         // all values also will be loaded from config few lines below
 
         // title can be passed instead of config
-        if(typeof config == 'string')
-            config = {title:config}
+        if (typeof config == 'string')
+            config = { title: config }
 
         this.created = false;
 
@@ -99,7 +48,7 @@ export default class Window {
 
         this.created = true;
 
-        if(!this.block){ // for static windows like chat
+        if (!this.block) { // for static windows like chat
             this.block = this.createParentBlock();
             this.moveTo(this.x, this.y); // user defined coordinates
             this.parent.appendChild(this.block);
@@ -116,8 +65,29 @@ export default class Window {
         windows.push(this);
     }
 
-    updateTitle(newTitle, temp=false){
-        if(!temp){
+    get width() {
+        return this.element?.getBoundingClientRect().width;
+    }
+
+    get height() {
+        return this.element?.getBoundingClientRect().height;
+    }
+
+    get left() {
+        return this.x;
+    }
+    get right() {
+        return this.x + this.width;
+    }
+    get top() {
+        return this.y;
+    }
+    get bottom() {
+        return this.y + this.height;
+    }
+
+    updateTitle(newTitle, temp = false) {
+        if (!temp) {
             this.title = newTitle;
         }
         const head = $('.windowTitle', this.element);
@@ -137,7 +107,7 @@ export default class Window {
         head.innerHTML = '<h3 class="windowTitle">' + this.title + '</h3>';
         el.appendChild(head);
 
-        if(this.closeable){
+        if (this.closeable) {
             const closer = document.createElement('div');
             closer.className = 'closeWindow';
             closer.innerHTML = '<div></div>';
@@ -146,7 +116,7 @@ export default class Window {
                 // prevent window moving
                 event.stopPropagation();
             });
-            closer.addEventListener('click', this.close.bind(this));
+            closer.addEventListener('click', () => this.close());
             head.appendChild(closer);
         }
 
@@ -163,11 +133,11 @@ export default class Window {
         const w = rect.width,
             h = rect.height;
 
-        this.x = Math.max(-w+10, x);
-        this.y = Math.max(-h+10, y);
+        this.x = Math.max(-w + 10, x);
+        this.y = Math.max(-h + 10, y);
 
-        this.x = Math.min(window.innerWidth-10, this.x);
-        this.y = Math.min(window.innerHeight-10, this.y);
+        this.x = Math.min(window.innerWidth - 10, this.x);
+        this.y = Math.min(window.innerHeight - 10, this.y);
 
         this.block.style.left = this.x + 'px';
         this.block.style.top = this.y + 'px';
@@ -192,37 +162,25 @@ export default class Window {
 
     addFeatures() {
         if (this.moveable) {
-            const ratio = window.devicePixelRatio||1;
-
-            $(this.block).on('pointerdown', () => {
+            $(this.block).on('pointerdown', e => {
                 let self = this;
+                let lastX = e.clientX;
+                let lastY = e.clientY;
 
                 jQuery(document).on('pointermove', moved)
 
                 function moved(e) {
                     e = e.originalEvent;
+                    let movedX = e.clientX - lastX;
+                    let movedY = e.clientY - lastY;
 
-                    let movedX = e.movementX/ratio,
-                        movedY = e.movementY/ratio;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
 
                     self.moveBy(movedX, movedY);
                 }
 
-                if (this.closeable) {
-                    deleteEl.style.display = 'block';
-                    deleteRange.style.display = 'block';
-
-                    jQuery([deleteEl, deleteRange]).one('pointerup', () => {
-                        this.close();
-                    })
-                }
-
                 jQuery(document).one('pointerup pointerleave', () => {
-                    deleteEl.style.display = 'none';
-                    deleteRange.style.display = 'none';
-
-                    jQuery([deleteEl, deleteRange]).off('pointerup');
-
                     jQuery(document).off('pointermove', moved);
                 });
             });
@@ -249,40 +207,73 @@ export default class Window {
 }
 
 let Modal_exists = false;
-export class Modal{
-    static get isRunning(){
+export class Modal {
+    static get isRunning() {
         return Modal_exists
     }
-    static set isRunning(val){
-        return Modal_exists=val;
+    static set isRunning(val) {
+        return Modal_exists = val;
     }
 
-    constructor(config={}){
-        if(Modal.isRunning)
+    constructor() {
+        if (Modal.isRunning)
             throw new Error('Modal is running');
 
         this.body = null;
 
-        Object.assign(this, config);
-        this.init();
+    }
+    
+    init() {
+        const els =
+        $(`<div class="modalBg">
+            <div class="modalCont">
+            </div>
+            </div>`);
+            
+            this.bgEl = els[0];
+        this.contEl = this.bgEl.children[0];
+        
+        $(document.body).append(els);
 
         Modal.isRunning = true;
     }
 
-    init(){
-        const els = 
-        $(`<div class="modalBg">
-            <div class="modalCont">
-            </div>
-        </div>`);
+    close() {
+        Modal.isRunning = false;
+        this.bgEl.remove();
+    }
+}
 
-        this.bgEl = els[0];
-        this.contEl = this.bgEl.children[0];
+export class ConfirmModal extends Modal {
+    constructor(msg, cb = null) {
+        super();
 
-        $('#ui').append(els);
+        this.msg = msg;
+        this.cb = cb;
+
+        this.init();
     }
 
-    close(){
-        this.bgEl.remove();
+    init() {
+        super.init();
+
+        const mBody = $(
+            `<div style="margin:0;padding:5px;text-align:center;color:var(--light-text)">
+                <p>${this.msg}</p>
+                <button class='confirmBtn' style="padding: 8px;">${t('OK')}</button>
+                <button class='cancelBtn' style="padding: 8px;">${t('Cancel')}</button>
+            </div>`)
+        this.contEl.appendChild(mBody[0]);
+
+        $('button', mBody).on('click', () => {
+            this.close();
+        });
+
+        $('.confirmBtn', mBody).on('click', () => {
+            if (this.cb) this.cb(true);
+        });
+        $('.cancelBtn', mBody).on('click', () => {
+            if (this.cb) this.cb(false);
+        });
     }
 }

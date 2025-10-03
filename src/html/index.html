@@ -7,12 +7,19 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="keywords" content="pixel, art, /r/place, place, reddit, pixelbattle, pixel battle">
 
-    <title class="translate">🌺Goroxels🌺</title>
+    <title class="translate">Goroxels🧡</title>
 </head>
 
 <body>
+    <script>
+        (function () {
+            if (!/eruda/.test(window.location)) return;
+            document.writeln(atob('PHNjcmlwdCBzcmM9Ii8vY2RuLmpzZGVsaXZyLm5ldC9ucG0vZXJ1ZGEiPjwvc2NyaXB0PjxzY3JpcHQ+PC9zY3JpcHQ+'));
+            let i = setInterval(() => { if (!window.eruda) return; window.eruda.init(); clearInterval(i) }, 10);
+        })();
+    </script>
+
     <div id="viewport">
-        <img id="template" src="https://i.imgur.com/4GQIMQ7.png">
         <canvas id="board"></canvas>
         <canvas id="fx"></canvas>
     </div>
@@ -23,8 +30,8 @@
                     <a href="/api/auth/vk">
                         <img src="../img/vk-logo.svg" alt="Log In with VK">
                     </a>
-                    <a href="/api/auth/facebook">
-                        <img src="../img/fb-logo.svg" alt="Log In with FB">
+                    <a href="/api/auth/google">
+                        <img src="../img/gg-logo.svg" alt="Log In with GOOGLE">
                     </a>
                     <a href="/api/auth/discord">
                         <img src="../img/discord-logo-circle.svg" alt="Log In with Discord">
@@ -44,7 +51,8 @@
                 </div>
                 <div id="emotions" class="minrole-user"></div>
                 <div id="myMessage" class="minrole-user">
-                    <input type="text" id="chatInput" data-translate="value" value="login to chat" disabled max="250">
+                    <input type="text" id="chatInput" autocomplete="off" data-translate="value" value="login to chat"
+                        disabled max="250">
                 </div>
             </div>
         </div>
@@ -57,7 +65,7 @@
             <div id="topMenu">
                 <div class="header">
                     <div class="miniBtn helpBtn desktop"></div>
-                    <div style="color: gold; text-shadow: 2px 2px 0 #000;">GOROXELS🌺</div>
+                    <div style="color: gold; text-shadow: 2px 2px 0 #000;">GOROXELS🍂</div>
                     <div id="rightTopPart">
                         <div class="translate authBtn desktop">LOG IN</div>
                         <a class="discordBtn desktop" href="https://discord.gg/zAupdTe2mB" target="_blank"></a>
@@ -66,7 +74,8 @@
                 <div class="content">
                     <div class="column" id="templateColumn">
                         <div class="columnHeader">
-                            <a class="discordBtn miniBtn bubbleBtn mobile verticalAligned" href="https://discord.gg/zAupdTe2mB" target="_blank"></a>
+                            <a class="discordBtn miniBtn bubbleBtn mobile verticalAligned"
+                                href="https://discord.gg/zAupdTe2mB" target="_blank"></a>
                             <div class="miniBtn helpBtn mobile verticalAligned"></div>
                             <div class="translate authBtn mobile verticalAligned">LOG IN</div>
                             <div class="translate hd" data-transform="lower">template</div>
@@ -81,18 +90,30 @@
                                     <td><input type="text" id="templateURL"></td>
                                 </tr>
                                 <tr class="tableRow">
-                                    <td class="fd">X</td>
-                                    <td><input type="number" id="templateX"></td>
-                                </tr>
-                                <tr class="tableRow">
-                                    <td class="fd">Y</td>
-                                    <td><input type="number" id="templateY"></td>
-                                </tr>
-                                <tr class="tableRow">
-                                    <td>
-                                        <div class="translate fd">template opacity</div>
+                                    <td class="fd coordsTd">
+                                        <div>X <input type="number" id="templateX"></div>
+                                        <div>Y <input type="number" id="templateY"></div>
+
+                                        <button id="manualMoveBtn" class="miniBtn mobile"
+                                            title="Toggle to move template" aria-pressed="false">
+
+                                            <img src="../img/move-icon.svg" alt="" width="16" height="16" srcset="">
+                                        </button>
+
                                     </td>
-                                    <td><input type="range" min=0 max=1 step=0.01 id="templateOpacity"></td>
+
+                                    <td>
+                                        <div class="translate fd">непрозрачность шаблона</div>
+                                        <input type="range" min="0" max="1" step="0.01" id="templateOpacity">
+                                    </td>
+                                </tr>
+                                <tr class="tableRow">
+                                    <td colspan="2">
+                                        <button id="showTemplates" class="translate">btn_show_templates</button>
+                                        <a href="/convert" target="_blank"><button
+                                                class="translate">btn_add_template</button></a>
+                                        <button id="shareTemplate" class="translate">btn_share_template</button>
+                                    </td>
                                 </tr>
                             </table>
                         </div>
@@ -161,7 +182,7 @@
                             <div id="showCanvases">
                                 <img src="../img/dots.svg" alt="show more">
                             </div>
-                            
+
                             <div class="translate hd" data-transform="lower" style="cursor: pointer;">online</div>&nbsp;
                             <div class="shadow" style="right: 0;position: absolute;margin-right: 5px;">
                                 <div class="onlineCounter online">0</div>
@@ -203,7 +224,9 @@
             <div id="placedPixels" class="bubble"></div>
         </div>
         <div id="uiBottom">
-            <div id="palette"></div>
+            <div id="palette">
+                <div class="chatNotif" style="display: none;"></div>
+            </div>
         </div>
     </div>
     <script type="text/javascript">

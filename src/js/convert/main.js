@@ -15,7 +15,6 @@ const importedPatterns = require('./patterns');
 import converterWProm from './converterWASM';
 (async () => {
     const module = await converterWProm
-    console.log(module);
     window.convModule = module;
     window.clrManip = clrManip;
 })()
@@ -25,8 +24,13 @@ import openImage from './openImage';
 
 import { upload } from './imgur';
 
-import { init, translate as t } from '../translate'
-init();
+import { init as initTranslates, translate as t } from '../translate'
+import { processApiErrors } from '../utils/api';
+import { isImagePixelArt, resizeCanvas } from './resize';
+import { linkNumberRangeInputs, watchInput } from './dom';
+initTranslates();
+
+let resizeKeepAspectRatio = true;
 
 // автоматический корректор инпута
 $('input[type=number]').on('change', (e) => {
@@ -39,7 +43,7 @@ $('input[type=number]').on('change', (e) => {
     if (input.min) {
         input.value = Math.max(input.value, input.min);
     }
-})
+});
 
 let utils = {
     // технически, любой путь подойдёт
@@ -60,14 +64,14 @@ let utils = {
 }
 
 const paletteSel = $('#paletteSel');
-function applyPalettes(selected='pixelplanet'){
+function applyPalettes(selected = 'pixelplanet') {
     Object.keys(palettes).forEach(key => {
         const newEl = $(`<option id="p_${key}">${key}</option>`);
         newEl.val(key);
 
-        if(key === selected)
+        if (key === selected)
             newEl.attr('selected', '');
-    
+
         paletteSel.prepend(newEl);
     });
     paletteSel.append('<option value="_custom">custom</option>');
@@ -260,11 +264,11 @@ let palUtils = {
             case 'ciede2000cpp':
                 deFunction = convModule.mciede2000;
                 palette = paletteLAB;
-            break
+                break
             case 'ciede2000cpp2':
                 deFunction = convModule.ciede2000;
                 palette = paletteLAB;
-            break
+                break
             case 'cmcic':
                 deFunction = clrManip.cmcicMix;
                 palette = paletteLAB;
@@ -367,7 +371,7 @@ let palUtils = {
         // в зависимости от расположения, цвет будет чередоваться
         let cntr = 0;
         for (let i = imgData.length - 1; i >= 0; i -= 4) {
-            if (imgData[i] > 0) {
+            if (imgData[i] > 127) {
                 let color = [imgData[i - 3], imgData[i - 2], imgData[i - 1]];
                 const colorEnc = (color[0] << 16) + (color[1] << 8) + color[2];
                 let matchIndex = -1;
@@ -390,6 +394,7 @@ let palUtils = {
 
                 const matchingColor = paletteRGB[matchIndex];
 
+                imgData[i] = 255;
                 imgData[i - 3] = matchingColor[0];
                 imgData[i - 2] = matchingColor[1];
                 imgData[i - 1] = matchingColor[2];
@@ -436,7 +441,7 @@ let palUtils = {
 
         let cntr = 0;
         for (let i = 0; i < imgData.length; i += 4) {
-            if (imgData[i + 3] > 0) {
+            if (imgData[i + 3] > 127) {
                 let origOffset = i / 4;
                 let x = origOffset % width;
                 let y = origOffset / width | 0; // отбрасывает числа после запятой
@@ -467,11 +472,12 @@ let palUtils = {
                 imgData[i] = matchingColor[0];
                 imgData[i + 1] = matchingColor[1];
                 imgData[i + 2] = matchingColor[2];
+                imgData[i + 3] = 255;
             } else {
-                imgData[i - 3] = 0;
-                imgData[i - 2] = 0;
-                imgData[i - 1] = 0;
                 imgData[i] = 0;
+                imgData[i + 1] = 0;
+                imgData[i + 2] = 0;
+                imgData[i + 3] = 0;
             }
             if (cntr++ % 2000 === 0) {
                 yield cntr / (imgData.length / 4);
@@ -481,9 +487,11 @@ let palUtils = {
     }
 }
 
+let palImageChanged = false;
 $('#palFolder').on('click', () => {
     openImage(dataURL => {
-        $('#palInput').val(t('[clipboard]'));
+        palImageChanged = true;
+        $('#palInput').val(t('[file]'));
         $('#palInput').data('source', 'dataURL');
 
         palUtils.dataURL = dataURL;
@@ -500,6 +508,8 @@ $('#palInput').on('keydown', (e) => {
     $('#palInput')[0].dataset.source = "url";
     if (e.code === 'Enter') {
         converterPreload();
+    } else {
+        palImageChanged = true;
     }
 });
 
@@ -545,6 +555,8 @@ $('#palInput').on('paste', (e) => {
         $('#palInput').data('source', 'dataURL');
         const tempImage = new Image();
         tempImage.onload = function () {
+            palImageChanged = true;
+
             const tempCanvas = document.createElement("canvas");
             tempCanvas.width = tempImage.width;
             tempCanvas.height = tempImage.height;
@@ -556,7 +568,10 @@ $('#palInput').on('paste', (e) => {
         tempImage.src = ev.target.result;
     };
     reader.readAsDataURL(image);
-})
+});
+
+linkNumberRangeInputs($('#resizeXInput')[0], $('#resizeXRange')[0])
+linkNumberRangeInputs($('#resizeYInput')[0], $('#resizeYRange')[0])
 
 function converterPreload(showWarn = true) {
     let path = $('#palInput').val();
@@ -588,8 +603,47 @@ function startPaletteConverter(url) {
         canvas.width = tempImg.width;
         canvas.height = tempImg.height;
 
+
         let ctx = canvas.getContext('2d');
         ctx.drawImage(tempImg, 0, 0);
+
+
+        if (palImageChanged) {
+            showResizeOptions();
+            palImageChanged = false;
+            $('#resizeXRange').attr('max', canvas.width * 2);
+            $('#resizeYRange').attr('max', canvas.height * 2);
+            $('#resizeXInput,#resizeXRange').val(canvas.width);
+            $('#resizeYInput,#resizeYRange').val(canvas.height);
+            $('#resizeXInput').data('ar', canvas.width / canvas.height);
+
+            $('#resizeAA').prop('checked', false);
+            $('#tryResizePixelArt').prop('checked', false);
+        } else {
+            let resizeWidth, resizeHeight;
+            let withAA = $('#resizeAA').is(':checked');
+
+            if ($('#tryResizePixelArt').is(':checked')) {
+                const { result, pixelSize } = isImagePixelArt(canvas);
+                if (!result) {
+                    toastr.warning(t('warn.notPixelArt'));
+                } else {
+                    resizeWidth = canvas.width / pixelSize;
+                    resizeHeight = canvas.height / pixelSize;
+                    withAA = false;
+                }
+            }
+
+            if (!resizeWidth || !resizeHeight) {
+                resizeWidth = $('#resizeXInput').val();
+                resizeHeight = $('#resizeYInput').val();
+            }
+
+
+            canvas = resizeCanvas(canvas, resizeWidth, resizeHeight, withAA);
+            ctx = canvas.getContext('2d');
+        }
+
         tempImg = null;
 
         try {
@@ -600,7 +654,19 @@ function startPaletteConverter(url) {
 
         const contrast = +$('#colorAdj').val();
         const brightness = +$('#brightAdj').val();
-        imgData = clrManip.adjustGamma(imgData, contrast, brightness)
+        imgData = clrManip.adjustGamma(imgData, contrast, brightness);
+
+        const doNotConvert = $('#doNotConvert').is(':checked');
+
+        if (doNotConvert) {
+            ctx.putImageData(imgData, 0, 0);
+
+            onDone(canvas, 'palOut',
+                () => {
+                    toastr.info(t('onDone.didNotConvert'));
+                });
+            return;
+        }
 
         let convGen; // converterGenerator
         switch ($('#ditheringMode').val()) {
@@ -660,8 +726,8 @@ function startPaletteConverter(url) {
                         toastr.info(`${t('Done in')} ${(Date.now() - startTime) / 1000}${t('s.')}`);
                     });
             } else {
-                let perc = loaded.value*100;
-                if(perc > 97) perc = 100;
+                let perc = loaded.value * 100;
+                if (perc > 97) perc = 100;
                 progressBar.css('width', perc + '%');
                 palUtils.converterInterval = setImmediate(rec);
             }
@@ -739,13 +805,13 @@ let patUtils = {
             this.patternsCans.push(canvas);
         }
     },
-    drawPattern(ctx, pattern, startX, startY, color){
+    drawPattern(ctx, pattern, startX, startY, color) {
         let s = this.patternSize;
         ctx.fillStyle = `rgb(${color.join(',')})`;
-        for(let x = 0; x < s; x++){
-            for(let y = 0; y < s; y++){
-                if(!pattern[x+y*s]) continue
-                ctx.fillRect(startX+x, startY+y, 1, 1);
+        for (let x = 0; x < s; x++) {
+            for (let y = 0; y < s; y++) {
+                if (!pattern[x + y * s]) continue
+                ctx.fillRect(startX + x, startY + y, 1, 1);
             }
         }
     },
@@ -796,7 +862,7 @@ let patUtils = {
 
             if (pattern) {
                 ctx2.drawImage(pattern, absX, absY);
-            }else{
+            } else {
                 this.drawPattern(ctx2, this.defaultPattern, absX, absY, color)
             }
 
@@ -812,7 +878,7 @@ let patUtils = {
 
 $('#patFolder').on('click', () => {
     openImage(dataURL => {
-        $('#patInput').val(t('[clipboard]'));
+        $('#patInput').val(t('[file]'));
         $('#patInput').data('source', 'dataURL');
 
         patUtils.dataURL = dataURL;
@@ -940,20 +1006,190 @@ function createImgData(width, height) {
     return newImgData
 }
 
-async function copyCanvasToClipboard(canvas){
+async function copyCanvasToClipboard(canvas) {
     const blob = await new Promise(res => canvas.toBlob(res));
     const item = new ClipboardItem({ "image/png": blob });
     navigator.clipboard.write([item]);
 }
 
-function downloadCanvas(canvas){
+async function copyToClipboard(text) {
+    await navigator.clipboard.writeText(text);
+}
+
+function downloadCanvas(canvas) {
     const link = document.createElement('a');
     link.download = 'filename.png';
     link.href = canvas.toDataURL()
     link.click();
 }
 
-async function onDone(canvas, convClass, callback) {
+async function sleep(ms) {
+    return new Promise(res => setTimeout(res, ms));
+}
+
+async function showUploadPrompt(palettizedCanvas) {
+    return new Promise((res, rej) => {
+        try {
+            const prompt = $('<div class="upload-prompt"></div>');
+            const thumbCanvas = document.createElement('canvas');
+            const thumbCtx = thumbCanvas.getContext('2d');
+
+            let thumbWidth, thumbHeight;
+            if (palettizedCanvas.width > palettizedCanvas.height) {
+                thumbWidth = 50;
+                thumbHeight = Math.round((palettizedCanvas.height / palettizedCanvas.width) * 50);
+            } else {
+                thumbHeight = 50;
+                thumbWidth = Math.round((palettizedCanvas.width / palettizedCanvas.height) * 50);
+            }
+
+            thumbCanvas.width = 50;
+            thumbCanvas.height = 50;
+
+            thumbCtx.clearRect(0, 0, 50, 50);
+            thumbCtx.drawImage(
+                palettizedCanvas,
+                (50 - thumbWidth) / 2,
+                (50 - thumbHeight) / 2,
+                thumbWidth,
+                thumbHeight
+            );
+
+            const thumbImg = $('<img>').attr('src', thumbCanvas.toDataURL());
+
+
+            const namesSelect = $(`<select style="margin-right: 3px;"/>`)
+                .addClass('template-names');
+
+            const nameInput = $(`<input type="text" placeholder="${t('template_name_desc')}">`)
+                .addClass('template-name');
+
+            const namesContainer = $('<div/>');
+            namesContainer.append(namesSelect, nameInput);
+
+            const patternContainer = $('<div class="checkbox-container"></div>');
+            const patternCheckbox = $('<input type="checkbox" id="convertToPattern" checked>')
+                .addClass('pattern-checkbox');
+            const patternLabel = $(`<label for="convertToPattern">${t('template_patternize')}</label>`);
+            patternContainer.append(patternCheckbox, patternLabel);
+
+            const publicContainer = $('<div class="checkbox-container"></div>');
+            const publicCheckbox = $('<input type="checkbox" id="isPublicTemplate">')
+                .addClass('public-checkbox');
+            const publicLabel = $(`<label for="isPublicTemplate">${t('template_is_public')}</label>`);
+            publicContainer.append(publicCheckbox, publicLabel);
+
+            const confirmButton = $(`<button>${t('upload_to_goroxels')}</button>`).addClass('confirm-upload');
+            prompt.append(thumbImg, namesContainer, patternContainer, publicContainer, confirmButton);
+            $('body').append(prompt);
+
+            async function onclick() {
+                const templateName = nameInput.val().trim();
+                if (templateName.length < 3 || templateName.length > 32) {
+                    toastr.error(t('template_name_shit'));
+                    return;
+                }
+
+                try {
+                    const formData = new FormData();
+                    const thumbBlob = await new Promise((resolve, reject) => {
+                        thumbCanvas.toBlob(b => b ? resolve(b) : reject(new Error("Failed to create thumbnail")), 'image/png');
+                    });
+                    formData.append('thumb', thumbBlob, 'thumbnail.png');
+
+                    let patternCanvas = palettizedCanvas, patternized = false;
+                    if (patternCheckbox.is(':checked')) {
+                        if (!patUtils || typeof patUtils.patternize !== "function") {
+                            throw new Error("Patternize utility not available");
+                        }
+
+                        let toast = toastr.info(`(0%)`, "PATTERN", {
+                            timeOut: 0,
+                            extendedTimeOut: 0,
+                            closeButton: true,
+                            tapToDismiss: false
+                        });
+
+                        patternized = true;
+
+                        const patternGen = patUtils.patternize(palettizedCanvas);
+                        let patternResult;
+                        while (!(patternResult = patternGen.next()).done) {
+                            await sleep(0);
+                            if (toast && toast.find('.toast-message').length) {
+                                toast.find('.toast-message').text(`${(patternResult.value * 100) | 0}%`);
+                            }
+                        }
+                        toast.remove();
+
+                        patternCanvas = patternResult.value;
+                    }
+
+                    const patternBlob = await new Promise((resolve, reject) => {
+                        patternCanvas.toBlob(b => b ? resolve(b) : reject(new Error("Failed to create pattern")), 'image/png');
+                    });
+                    formData.append('pattern', patternBlob, 'pattern.png');
+
+                    const isPublic = publicCheckbox.is(':checked');
+                    const origWidth = patternized ? palettizedCanvas.width : '';
+                    const url = `/api/template/add?name=${encodeURIComponent(templateName)}&public=${isPublic}&width=${origWidth}`;
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include'
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const result = await response.json();
+
+                    if (result.errors) {
+                        processApiErrors(result.errors);
+                        return;
+                    }
+
+                    toastr.success('Template uploaded successfully!');
+                    prompt.remove();
+                    res(result);
+
+                } catch (error) {
+                    toastr.error('Upload failed: ' + error.message);
+                    rej(error);
+                }
+            }
+
+            confirmButton.on('click', onclick);
+
+            fetch(`/api/template/list?self=1`, {
+                credentials: 'include'
+            }).then(async response => {
+                const result = await response.json();
+
+                if (result.errors) {
+                    processApiErrors(result.errors);
+                    return;
+                }
+
+                const templates = result;
+
+                for(const template of templates){
+                    const option = $(`<option value="${template.name}">${template.name}</option>`);
+                    namesSelect.append(option);
+                }
+
+                namesSelect.on('change', () => {
+                    nameInput.val(namesSelect.val());
+                })
+            }).catch(toastr.error);
+
+        } catch (err) {
+            rej(err);
+        }
+    });
+}
+
+
+function onDone(canvas, convClass, callback) {
     $(`#${convClass} > *`).remove();
 
     canvas.className = 'outputImg';
@@ -970,7 +1206,8 @@ async function onDone(canvas, convClass, callback) {
     $(`#${convClass}`).append(
         `<div class="afterImage">
             <div class="line"><button class="uploadButton"> ${t('Upload on imgur!')}</button></div>
-            <div class="line"><span class="imgurUrl"></span></div>
+            ${convClass === 'palOut' ? `<div class="line"><button class="uploadGrokselsButton">${t('upload_to_goroxels')}</button></div>` : ''}
+            <div class="line"><span class="uploadedUrl"></span></div>
             ${convClass === 'patOut' ? `<div class="line">${t('Final image size:')} ${canvas.width}x${canvas.height}</div>` : ''}
             <div class="line"><button class="copyToClipButton">${t('copy_canvas_btn')}</button></div>
             <div class="line"><button class="downloadButton">${t('download_canvas_btn')}</button></div>
@@ -979,23 +1216,23 @@ async function onDone(canvas, convClass, callback) {
     imgZoom.createZoomHandler($(`#${convClass}`).children(0)[0]);
 
     $(`#${convClass} .uploadButton`).one('click', async () => {
-        $(`#${convClass} .imgurUrl`).text('Uploading...');
+        $(`#${convClass} .uploadedUrl`).text('Uploading...');
 
         try {
             const link = await upload(canvas.toDataURL().split(",")[1]);
             const isPNG = link.endsWith('png');
-            if(!isPNG) {
+            if (!isPNG) {
                 toastr.warn('JPEG!!!');
                 throw new Error;
             }
 
-            $(`#${convClass} .imgurUrl`).html(
+            $(`#${convClass} .uploadedUrl`).html(
                 `<span style="color:rgb(0, 190, 0)">${link}${convClass === 'patOut' ? `?width=${canvas.width / 7}` : ''}</span>`
             )
         } catch {
             const text = t('Imgur upload failed, try upload manually');
             let html;
-            if(convClass === 'patOut'){
+            if (convClass === 'patOut') {
                 html = `${text}<br><input id="patternLinkGenerator" placeholder="${t('insert_link_here')}">&nbsp;<span id="patternLink"></span>`;
                 setTimeout(() => {
                     const span = $('#patternLink');
@@ -1004,8 +1241,8 @@ async function onDone(canvas, convClass, callback) {
                         let link = input.value;
                         input.style.backgroundColor = '';
 
-                        if(link.includes('imgur') && !link.endsWith('.png')){
-                            if(link.includes('/a/')){
+                        if (link.includes('imgur') && !link.endsWith('.png')) {
+                            if (link.includes('/a/')) {
                                 input.style.backgroundColor = 'red';
                                 return span.text(t('imgur_album_link'))
                             }
@@ -1018,25 +1255,77 @@ async function onDone(canvas, convClass, callback) {
                         span.text(link);
                     })
                 })
-            }else{
+            } else {
                 html = text;
             }
 
-            $(`#${convClass} .imgurUrl`).html(html)
+            $(`#${convClass} .uploadedUrl`).html(html)
         }
     });
 
     $(`#${convClass} .copyToClipButton`).one('click', () => {
         copyCanvasToClipboard(canvas)
-            .then(() => toastr.success('Copied!'));
+            .then(() => toastr.success(t('img_copied_success')));
     });
 
     $(`#${convClass} .downloadButton`).one('click', () => {
         downloadCanvas(canvas)
     });
 
+    if (convClass === 'palOut') {
+        $(`#${convClass} .uploadGrokselsButton`).one('click', () => {
+            showUploadPrompt(canvas).then(template => {
+                if (template === null || template === undefined) {
+                    return;
+                }
+                const filePath = template.file;
+                $(`#${convClass} .uploadedUrl`).text(`GRX/?f=${filePath}&w=${canvas.width}`);
+            });
+        });
+    }
+
+    $(`#${convClass} .uploadedUrl`).on('click', (e) => {
+        copyToClipboard(e.target.innerText).then(() => toastr.success(t('conv.url_copied_success')));
+    });
+
     callback();
 }
+
+$('#aspectRatioLock').on('click', e => {
+    const btn = e.target;
+    if (btn.classList.contains('active')) {
+        btn.classList.remove('active');
+        resizeKeepAspectRatio = false;
+    } else {
+        btn.classList.add('active');
+        resizeKeepAspectRatio = true;
+    }
+})
+
+function showResizeOptions() {
+    $('#resizeXInput,#resizeYInput').parent().removeClass('hidden');
+}
+
+// listeners to keep aspect ratio
+$('#resizeXInput,#resizeXRange').on('input', e => {
+    // to prevent infinite cycle of input events
+    if (!e.originalEvent?.isTrusted || !resizeKeepAspectRatio) return;
+    const newWidth = e.target.value
+
+    const ar = parseFloat($('#resizeXInput').data('ar'));
+    const newHeight = Math.floor(newWidth / ar);
+    $('#resizeYInput,#resizeYRange').val(newHeight);
+});
+$('#resizeYInput,#resizeYRange').on('input', e => {
+    if (!e.originalEvent?.isTrusted || !resizeKeepAspectRatio) return;
+    const newHeight = e.target.value
+
+    const ar = parseFloat($('#resizeXInput').data('ar'));
+    const newWidth = Math.floor(newHeight * ar);
+    $('#resizeXInput,#resizeXRange').val(newWidth);
+});
+
+
 
 let palName;
 loadGamePalettes().then(() => {

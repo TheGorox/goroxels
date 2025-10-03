@@ -10,34 +10,28 @@ import {
     screenToBoardSpace
 } from './utils/conversions';
 
-import player from './player'
+import player, { placePixel, placePixels, updateBrush } from './player';
 import {
-    FX
-} from './fxcanvas'
+    addFX,
+    FX,
+    removeFX
+} from './fxcanvas';
 import {
     boardHeight,
     boardWidth,
     canvasId,
     chunkSize,
     hexPalette,
-    palette
-} from './config'
-import camera from './camera'
+    palette,
+    showProtected
+} from './config';
+import camera from './camera';
 import {
-    chatInput
-} from './elements'
-import {
-    placePixel,
-    toggleChat,
-    toggleTopMenu,
-    toggleEverything,
-    placePixels,
-    updateTemplate,
-    updateBrush,
-    showProtected,
     changeSelector,
-    apiRequest
-} from './actions'
+    chatInput
+} from './ui/elements';
+
+
 import { ROLE } from './constants';
 
 import clickerIcon from '../img/toolIcons/clicker.png'
@@ -48,17 +42,19 @@ import lineIcon from '../img/toolIcons/line.png'
 import protectIcon from '../img/toolIcons/protect.png'
 import revertIcon from '../img/toolIcons/revert.png'
 
-import template from './template';
+import template, { updateTemplate } from './template';
 import me from './me';
 import { closestColor } from './utils/color';
 import { getLS, getOrDefault, setLS } from './utils/localStorage';
 import { htmlspecialchars, testPointInPolygon } from './utils/misc';
-import Bucket from './Bucket';
-import { map } from './utils/math';
+import { mapRange } from './utils/math';
 
 import min5fontSheet from '../font/pixel/min5.png';
 import min5fontInfo from '../font/pixel/min5.txt';
 import MiniWindow from './MiniWindow';
+import { apiRequest } from './utils/api';
+import { toggleChat } from './Chat';
+import { toggleEverything, toggleTopMenu } from './ui/toggles';
 
 const mobile = globals.mobile;
 
@@ -112,29 +108,6 @@ function onToolManager(cb) {
     else tmCallbacks.push(cb)
 }
 
-// fxRenderer is loaded later then tools
-// so here is workaround
-let _deferredFX = [];
-function addFX(fx, layer) {
-    if (globals.fxRenderer) {
-        globals.fxRenderer.add(fx, layer);
-    } else _deferredFX.push([fx, layer]);
-}
-
-function removeFX(fx) {
-    globals.fxRenderer.remove(fx);
-}
-
-let fxi = setInterval(() => {
-    if (globals.fxRenderer) {
-        clearInterval(fxi);
-        for (let [fx, layer] of _deferredFX) {
-            addFX(fx, layer);
-        }
-        _deferredFX = [];
-    }
-}, 5);
-
 function renderFX() {
     globals.fxRenderer.needRender = true;
 }
@@ -150,10 +123,10 @@ class Clicker extends Tool {
         this._pendingPixels = {};
         this.minZoom = 2;
 
-        this.on('down', this.down)
-        this.on('up', this.up)
-        this.on('move', this.move)
-        this.on('leave', this.up)
+        this.on('down', this.down);
+        this.on('up', this.up);
+        this.on('move', this.move);
+        this.on('leave', this.up);
         this.on('_gesture', this.ongesture);
 
         onToolManager(() => {
@@ -161,6 +134,7 @@ class Clicker extends Tool {
             // so this will duplicate them
             if (!mobile) {
                 globals.eventManager.on('mousedown', this.mousedown.bind(this));
+                globals.toolManager.on('move', this.move.bind(this));
                 globals.eventManager.on('mouseup', this.mouseup.bind(this));
             }
         })
@@ -181,6 +155,8 @@ class Clicker extends Tool {
         this.screenPos = [e.clientX, e.clientY];
     }
     mouseup(e) {
+        if (globals.toolManager.tools['mover'].key !== 'LMB') return;
+
         if (e.button !== 0 || !this.screenPos) return;
         const dx = Math.abs(e.clientX - this.screenPos[0]);
         const dy = Math.abs(e.clientY - this.screenPos[1]);
@@ -226,7 +202,7 @@ class Clicker extends Tool {
 
         const pixel = getPixel(x, y),
             isProtected = getProtect(x, y);
-        if (pixel === myColor || pixel === -1 || (isProtected && me.role < ROLE.MOD)) return;
+        if (pixel === myColor || pixel === -1 || (isProtected && me.role < ROLE.TRUSTED)) return;
 
         if (this._pendingPixels[key] && this._pendingPixels[key][0] === myColor) return;
         this._pendingPixels[key] = [myColor, Date.now()];
@@ -288,10 +264,7 @@ class Clicker extends Tool {
     }
 
     checkAllowance(count) {
-        if (player.bucket.allowance < count) {
-            return false
-        }
-        return true
+        return player.bucket.allowance >= count;
     }
 
     place(pixels) {
@@ -418,8 +391,11 @@ class Mover extends Tool {
         this.handlers();
 
         this.downPos = [0, 0];
-        this.lastPos = [0, 0];
 
+        // time when "down" was called
+        this.downTime = 0;
+
+        this.lastPos = [0, 0];
         this.lastPlayerPos = [0, 0];
 
         if (!mobile) {
@@ -484,9 +460,8 @@ class Mover extends Tool {
         // guess it's uneffictive
         changeSelector('#ui>div>*', { 'pointer-events': 'none' })
 
-        if (!mobile) {
-            this.downPos = this.lastPos = [e.clientX, e.clientY]
-        }
+        this.downPos = this.lastPos = [e.clientX, e.clientY];
+        this.downTime = Date.now();
     }
     up(e) {
         if (e.ctrlKey) return;
@@ -494,9 +469,12 @@ class Mover extends Tool {
         this.mousedown = false;
         changeSelector('#ui>div>*', { 'pointer-events': 'all' })
 
-        if (!mobile && this.moveThresold() && e.type !== 'mouseleave') {
-            // right/middle/anything
-            if (e instanceof MouseEvent && e.button != 0) return;
+        // long tap to get pixel info
+        if (mobile && this.moveThreshold() && !e.gesture) {
+            const ela = Date.now() - this.downTime;
+            if (ela < 1000) return;
+
+            pixelInfo.emit('up');
         }
     }
 
@@ -518,10 +496,10 @@ class Mover extends Tool {
 
         if (!this.mousedown) return;
 
+        this.lastPos = [e.clientX, e.clientY]
         if (!mobile) {
-            this.lastPos = [e.clientX, e.clientY]
 
-            if (this.moveThresold())
+            if (this.moveThreshold())
                 return
         }
 
@@ -529,12 +507,12 @@ class Mover extends Tool {
         camera.moveTo(-e.movementX / camera.zoom /* / devicePixelRatio */, -e.movementY / camera.zoom /* / devicePixelRatio */);
     }
 
-    moveThresold() {
+    moveThreshold() {
         return (Math.abs(this.downPos[0] - this.lastPos[0]) < 5 &&
             Math.abs(this.downPos[1] - this.lastPos[1]) < 5)
     }
 }
-const mover = new Mover('mover', null, moveIcon);
+const mover = new Mover('mover', 'LMB', moveIcon);
 
 class FloodFill extends Tool {
     constructor(...args) {
@@ -674,7 +652,6 @@ class FloodFill extends Tool {
 
 
             ctx.strokeWidth = camera.zoom;
-            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight)
 
             this.showedPixels.forEach((p, i) => {
                 let [x, y] = p.split(',').map(x => parseInt(x, 10));
@@ -752,7 +729,8 @@ class FloodFill extends Tool {
         return true
     }
 }
-const floodfill = new FloodFill('floodfill', 'KeyF', floodfillIcon);
+const
+    floodfill = new FloodFill('floodfill', 'KeyF', floodfillIcon);
 
 class Pipette extends Tool {
     constructor(...args) {
@@ -1205,7 +1183,6 @@ class Grid extends Tool {
         this.state = 0;
         this.fx = null;
 
-        this.isLight = JSON.parse(getOrDefault('lightGrid', false));
         this.pattern = null;
 
         camera.on('zoom', () => {
@@ -1233,9 +1210,12 @@ class Grid extends Tool {
         let { width, height } = ctx.canvas;
         const zoom = camera.zoom;
 
-        // ctx.fillStyle = this.isLight ? 'white' : 'black';
-        ctx.fillStyle = 'rgb(127,127,127)'
-        ctx.globalAlpha = 0.8;
+
+        ctx.fillStyle = 'rgb(127,127,127)';
+
+        // make grid fade out from zoom 16 to 5 (lower than 5 is invisible)
+        const calculatedAlpha = zoom > 16 ? 0.5 : mapRange(zoom, 24, 5, 0.5, 0);
+        ctx.globalAlpha = calculatedAlpha;
 
         let thickInterval;
         if (chunkSize % 16 == 0) thickInterval = 16;
@@ -1253,22 +1233,22 @@ class Grid extends Tool {
         // pixels lines
         for (; clientX < width; clientX += zoom) {
             x++
-            if (x % thickInterval == 0) wid = .7;
-            else wid = .7;
+            if (x % thickInterval == 0) wid = 1;
+            else wid = 1;
 
             if (x % chunkSize == 0) wid = 1;
 
-            ctx.fillRect(clientX, 0, wid, height);
+            ctx.fillRect(clientX | 0, 0, wid, height);
         }
 
         for (; clientY < height; clientY += zoom) {
             y++
-            if (y % thickInterval == 0) wid = .7;
-            else wid = .7;
+            if (y % thickInterval == 0) wid = 1;
+            else wid = 1;
 
             if (y % chunkSize == 0) wid = 1;
 
-            ctx.fillRect(0, clientY, width, wid);
+            ctx.fillRect(0, clientY | 0, width, wid);
         }
 
         ctx.globalAlpha = 1;
@@ -1298,7 +1278,7 @@ class Grid extends Tool {
     }
 
     render(ctx) {
-        if (camera.zoom <= 4) return 1;
+        if (camera.zoom <= 5) return 1;
 
         this.drawGrid(ctx);
     }
@@ -1400,7 +1380,7 @@ class Paste extends Tool {
             const [x, y] = boardToScreenSpace(xPos, yPos);
             const z = camera.zoom;
 
-            const opacity = map(Math.sin(Date.now() / 400), -1, 1, 0.5, 1);
+            const opacity = mapRange(Math.sin(Date.now() / 400), -1, 1, 0.5, 1);
             ctx.globalAlpha = opacity;
 
             ctx.save();
@@ -2066,8 +2046,8 @@ export class PixelFont {
         this.loaded = true;
     }
 
-    drawText(text, color='black') {
-        if(!this.loaded) throw new Error('font not loaded');
+    drawText(text, color = 'black') {
+        if (!this.loaded) throw new Error('font not loaded');
 
         text = text.toUpperCase();
 
@@ -2076,7 +2056,7 @@ export class PixelFont {
             height: textHeight
         } = this.measureText(text);
 
-        if(textWidth == 0 || textHeight == 0){
+        if (textWidth == 0 || textHeight == 0) {
             return null;
         }
 
@@ -2091,20 +2071,20 @@ export class PixelFont {
 
         const textLetters = text.split('');
         let cursorX = 0, cursorY = 0;
-        for(let letter of textLetters){
-            if(letter == '\n'){
+        for (let letter of textLetters) {
+            if (letter == '\n') {
                 cursorY += this.defaultHeight + PixelFont.defaultVSpacing;
                 cursorX = 0;
                 continue
             }
 
-            if(letter == ' '){
+            if (letter == ' ') {
                 cursorX += this.defaultWidth;
                 continue
             }
 
             let letterImData = this.letters[letter];
-            if(!letterImData){
+            if (!letterImData) {
                 cursorX += this.defaultWidth;
                 continue
             }
@@ -2127,28 +2107,28 @@ export class PixelFont {
         return colorCanvas;
     }
 
-    measureText(text){
-        if(!this.loaded) throw new Error('font not loaded');
+    measureText(text) {
+        if (!this.loaded) throw new Error('font not loaded');
 
         text = text.toUpperCase();
 
         const textLetters = text.split('');
         let curWidth = 0, maxWidth = 0, height = this.defaultHeight;
 
-        for(let letter of textLetters){
-            if(letter == '\n'){
+        for (let letter of textLetters) {
+            if (letter == '\n') {
                 height += this.defaultHeight + PixelFont.defaultVSpacing;
                 maxWidth = Math.max(curWidth, maxWidth);
                 curWidth = 0;
                 continue
             }
 
-            if(letter == ' '){
+            if (letter == ' ') {
                 curWidth += this.defaultWidth;
                 continue
             }
 
-            if(this.letters[letter]){
+            if (this.letters[letter]) {
                 curWidth += (this.letters[letter].width || this.defaultWidth) + 1;
             }
         }
@@ -2173,15 +2153,17 @@ class Text extends Tool {
         this.on('down', this.down.bind(this));
     }
 
-    down(e){
-        if(this.miniWindow && !this.miniWindow.closed) return;
+    down(e) {
+        if (this.miniWindow && !this.miniWindow.closed) return;
+
+        globals.lockInputs = true;
 
         this.miniWindow = new MiniWindow('Draw text', 2);
         const winEl = this.miniWindow.element;
-        if(mobile){
+        if (mobile) {
             winEl.css('left', 0).css('top', 0);
-        }else{
-            winEl.css('left', window.screen.width/3).css('top', window.screen.height/3);
+        } else {
+            winEl.css('left', window.screen.width / 3).css('top', window.screen.height / 3);
         }
 
         const innerHtml = $(`
@@ -2213,20 +2195,20 @@ class Text extends Tool {
         let lastText = null, lastColor = player.color, lastTextCanvas = null
         const previewFx = new FX((ctx) => {
             const text = textInput.val();
-            if(!text) return 0;
+            if (!text) return 0;
 
-            if(!font.loaded){
+            if (!font.loaded) {
                 return 0;
             }
 
             // remap the sine value based on the time
             // to the min-max opacity borders
-            ctx.globalAlpha = map(Math.sin(Date.now()/400), -1, 1, 0.2, 0.9);
+            ctx.globalAlpha = mapRange(Math.sin(Date.now() / 400), -1, 1, 0.2, 0.9);
 
             const x = xCordInput.val();
             const y = yCordInput.val();
 
-            if(lastText !== text || lastColor !== player.color){
+            if (lastText !== text || lastColor !== player.color) {
                 lastText = text;
                 lastColor = player.color;
                 lastTextCanvas = font.drawText(lastText, hexPalette[lastColor]);
@@ -2234,16 +2216,16 @@ class Text extends Tool {
 
             const [screenX, screenY] = boardToScreenSpace(x, y);
 
-            
+
             ctx.save();
             ctx.scale(camera.zoom, camera.zoom);
 
             ctx.imageSmoothingEnabled = false;
 
-            const deZoomedX = screenX/camera.zoom;
-            const deZoomedY = screenY/camera.zoom;
+            const deZoomedX = screenX / camera.zoom;
+            const deZoomedY = screenY / camera.zoom;
 
-            if(~player.secondCol){
+            if (~player.secondCol) {
                 ctx.fillStyle = hexPalette[player.secondCol];
                 ctx.fillRect(deZoomedX, deZoomedY, lastTextCanvas.width, lastTextCanvas.height);
             }
@@ -2256,20 +2238,22 @@ class Text extends Tool {
         addFX(previewFx);
 
         this.miniWindow.on('okClicked', () => {
+            globals.lockInputs = false;
+
             removeFX(previewFx);
 
             const text = textInput.val();
-            if(!text || !lastTextCanvas) return;
+            if (!text || !lastTextCanvas) return;
 
             // add background if second color is selected
-            if(~player.secondCol){
+            if (~player.secondCol) {
                 const ctx = lastTextCanvas.getContext('2d');
                 // draw only on opaque pixels
                 ctx.globalCompositeOperation = 'destination-over';
                 ctx.fillStyle = hexPalette[player.secondCol];
                 ctx.fillRect(0, 0, lastTextCanvas.width, lastTextCanvas.height);
             }
-            
+
             const x = +xCordInput.val();
             const y = +yCordInput.val();
 
@@ -2277,11 +2261,18 @@ class Text extends Tool {
         });
 
         this.miniWindow.on('cancelClicked', () => {
+            globals.lockInputs = false;
+
             removeFX(previewFx);
         });
     }
 }
-const text = new Text('text', 'KeyT', null, ROLE.TRUSTED)
+const text = new Text('text', 'KeyT', null, ROLE.USER);
+
+const resetColors = new Tool('reset colors', 'RMB');
+resetColors.on('up', () => {
+    player.resetColors();
+});
 
 export default {
     clicker,
@@ -2302,5 +2293,6 @@ export default {
     square,
     incBrush, decBrush,
     pixelInfo,
-    text
+    text,
+    resetColors
 }

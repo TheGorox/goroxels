@@ -5,25 +5,20 @@ import globals from './globals';
 import ChunkManager from './ChunkManager';
 import Renderer from './Renderer';
 import { FXRenderer } from './fxcanvas';
-import player from './player';
+import player, { updateMe } from './player';
 import ToolManager from './ToolManager';
-import { calculateColumnSize, getRecommendedColorSize, initHalfmap } from './utils/misc';
+import { calculateColumnSize, initHalfmap } from './utils/misc';
 
 import * as config from './config';
-import {
-    updateMe,
-    initInputs,
-    initOtherCoolFeatures,
-    fixChatPosition,
-    fixColorsWidth,
-    showPatternsOnPalette,
-    removeOldKeybinds
-} from './actions';
 import { init as initTranslate, translate } from './translate';
 import camera from './camera';
 import { Modal } from './Window';
 import { getLS, setLS } from './utils/localStorage';
 import * as indexedDb from './indexedDb';
+import { initInputs, initOtherCoolFeatures } from './init';
+import { toggleTopMenu } from './ui/toggles';
+import { fixColorsWidth } from './ui/config';
+import { fixChatPosition } from './Chat';
 
 (async () => {    
     indexedDb.init();
@@ -63,7 +58,7 @@ import * as indexedDb from './indexedDb';
     window.oncontextmenu = function (e) {
         if (e.target === globals.elements.mainCanvas ||
             e.target.classList[0] === 'paletteColor' ||
-            e.path[1].classList[0] === 'paletteColor') {
+            (e.path && e.path[1].classList[0] === 'paletteColor')) {
             e.preventDefault();
         }
     }
@@ -158,6 +153,7 @@ import * as indexedDb from './indexedDb';
         if (getLS('modal18') == 'accepted') return;
 
         const m = new Modal;
+        m.init();
         const mBody = $(
             `<div style="margin:0;padding:5px;text-align:center;">
                 <h1>${translate('WARNING')}</h1>
@@ -171,11 +167,14 @@ import * as indexedDb from './indexedDb';
         $('button', mBody).on('click', () => {
             m.close();
             setLS('modal18', 'accepted');
-        })
+        });
     });
 
     updateMe();
     initTranslate();
     initInputs();
     initOtherCoolFeatures();
+    // now hides by default
+    if(globals.mobile)
+        toggleTopMenu();
 })();

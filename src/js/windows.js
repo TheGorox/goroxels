@@ -1,34 +1,169 @@
-import {
-    ROLE,
-    keys
-} from './constants';
-import {
-    translate as tr,
-    translate
-} from './translate';
-
-import { ROLE_I } from './constants'
-import Window from './Window';
-import { decodeKey } from './utils/misc';
-import { game } from './config'
-import globals from './globals';
-import me from './me';
-import player from './player'
-import { apiRequest, fetchCaptcha, fixChatPosition, makeScreenshot, setPaletteColorsSize, showPatternsOnPalette, showProtected, solveCaptcha, toggleEmojis, togglePlaced, unloadPalettePatterns, updateBrush, updateEmojis, updateMe } from './actions';
 import toastr from 'toastr';
+
+import chat, { fixChatPosition, toggleEmojis, updateEmojis } from './Chat';
+import { game, showProtected } from './config';
+import { ROLE, ROLE_I } from './constants';
+import { urlInput } from './ui/elements';
+import globals from './globals';
+import { showHistoryCanvas, unloadHistoryCanvas, wipes } from './history';
+import me from './me';
+import player, { togglePlaced, updateBrush, updateMe } from './player';
 import tools from './tools';
-import chat from './chat';
-import { getLS, getOrDefault, setLS } from './utils/localStorage';
+import { translate as t, translate as tr } from './translate';
 import User from './user';
-import { htmlspecialchars } from './utils/misc';
-
-import userImg from '../img/user2.png';
-import arrowSvg from '../img/arrow.svg'
+import Window, { ConfirmModal } from './Window';
+import { getLS, getOrDefault, setLS } from './utils/localStorage';
 import { capitalize } from './utils/strings';
+import { decodeKey, getEventKeyCode, htmlspecialchars, makeScreenshot, reverseFade, stringifyKeyEvent } from './utils/misc';
 
-import vkLogo from '../img/vk-logo.svg';
+import arrowSvg from '../img/arrow.svg';
+import desktopIcon from '../img/icon-desktop.svg';
+import mobileIcon from '../img/icon-phone.svg';
+import userImg from '../img/user2.png';
 import dsLogo from '../img/discord-logo-circle.svg';
-import fbLogo from '../img/fb-logo.svg';
+import ggLogo from '../img/gg-logo.svg';
+import vkLogo from '../img/vk-logo.svg';
+
+import lmbIcon from '../img/mouse/mouse-lmb.png';
+import rmbIcon from '../img/mouse/mouse-rmb.png';
+import mmbIcon from '../img/mouse/mouse-mmb.png';
+import mb4Icon from '../img/mouse/mouse-4mb.png';
+import mb5Icon from '../img/mouse/mouse-5mb.png';
+import { apiRequest, fetchCaptcha, solveCaptcha } from './utils/api';
+import { shareTemplate, showTemplates, updateTemplate } from './template';
+import { setPaletteColorsSize, showPatternsOnPalette, unloadPalettePatterns } from './ui/config';
+
+
+const mouseKeys = {
+    'LMB': lmbIcon,
+    'RMB': rmbIcon,
+    'MMB': mmbIcon,
+    '4MB': mb4Icon,
+    '5MB': mb5Icon,
+}
+
+export function initButtons() {
+    $('#accountSettings').on('click', accountSettings);
+    $('#toolBinds').on('click', keyBinds);
+    $('#uiSettings').on('click', uiSettings);
+    $('#canvasSettings').on('click', gameSettings);
+    $('#toolsB').on('click', toolsWindow);
+    $('.authBtn').on('click', authWindow);
+    $('#showTemplates').on('click', showTemplates);
+    $('#shareTemplate').on('click', shareTemplate);
+}
+
+export function initHelpButton() {
+    $('.helpBtn').on('click', () => {
+        help();
+    })
+}
+
+export function showHelpIfFirstTime() {
+    const shownAlready = getLS('helpShown');
+    if (!shownAlready) {
+        setLS('helpShown', '1');
+        help();
+    }
+}
+
+
+
+export function initOnlineViewer() {
+    $('#onlineColumn .columnHeader').on('click', async () => {
+        let json;
+        try {
+            const resp = await fetch('/api/online');
+            json = await resp.json();
+        } catch (e) {
+            toastr.error(e);
+            return
+        }
+
+        onlineViewWindow(json);
+    });
+}
+
+
+function createCollapsibleBlock(title, bodyHtml, collapsed = true) {
+    const head = $('<div>');
+    head[0].style.cssText =
+        `width: 100%;
+    height: 30px;
+    background-color: #5f5f5f;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+    cursor: pointer`
+
+    head.append(`<div style="font-size:20px;text-transform:uppercase;">${title}</div>`)
+
+    const arrow = $('<div>');
+    arrow[0].style.cssText =
+        `position: absolute;
+    top: 50%;
+    transform: translate(0, -50%);
+    left: 5px;
+    background-image: url(${arrowSvg});
+    background-size: 100%;
+    background-repeat: no-repeat;
+    transition: transform .2s ease-in-out;
+    width: 20px;
+    height: 20px;`
+
+    head.append(arrow);
+
+    const body = $('<div>');
+    body[0].style.cssText =
+        `max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s linear;
+    font-size: 20px;`
+
+    const innerBody = $('<div>');
+    innerBody[0].style.cssText =
+        `padding:8px`
+    innerBody.html(bodyHtml);
+
+    body.append(innerBody);
+
+    const headBodyContainer = $('<div>');
+    headBodyContainer[0].style.cssText =
+        `margin-bottom: 1px;`
+    headBodyContainer.append(head, body)
+
+    let state = 0; // 0 - closed, 1 - opened
+    let reCheckHeightIntervalId = null;
+    function toggle() {
+        clearTimeout(reCheckHeightIntervalId);
+        if (state) {
+            arrow.css('transform', 'translate(0px, -50%) rotate(0deg)');
+            body.css('max-height', 0);
+        } else {
+            arrow.css('transform', 'translate(0px, -50%) rotate(180deg)');
+
+            requestAnimationFrame(() => {
+                // force layout calc reflow
+                // otherwise scrollHeight may be not updated
+                body[0].offsetHeight;
+
+                body.css('max-height', body[0].scrollHeight);
+
+                reCheckHeightIntervalId = setTimeout(() => {
+                    body.css('max-height', body[0].scrollHeight);
+                }, 300);
+            });
+        }
+        state = !state;
+    }
+    if (!collapsed) setTimeout(toggle);
+
+    head.on('click', toggle);
+
+    return headBodyContainer
+}
 
 export function generateTable(arr = []) {
     const table = $('<table class="columnTable"></table>');
@@ -49,7 +184,7 @@ export function generateTable(arr = []) {
 
 export function accountSettings() {
     const settingsWin = new Window({
-        title: capitalize(translate('account settings')),
+        title: capitalize(t('account settings')),
         center: true
     });
     if (!settingsWin.created) return;
@@ -122,12 +257,14 @@ export function accountSettings() {
 
 export function keyBinds() {
     const keysWin = new Window({
-        title: capitalize(translate('toolbinds settings')),
+        title: capitalize(t('toolbinds settings')),
         center: true
     });
     if (!keysWin.created) return;
 
     let table = generateTable();
+
+
 
     for (const tool of Object.values(tools)) {
         if (!tool.key) continue;
@@ -135,70 +272,111 @@ export function keyBinds() {
 
         const tableRow = $(
             `<tr>
-            <td>${tool.name}</td>
+            <td>${t('toolName.' + tool.name)}</td>
             <td>
-                <span id="MODS-${tool.name}"></span>
-                <input id="KEY-${tool.name}" class="key" style="width:130px">
+                <div class="toolKeys" id="KEYS-${tool.name}">
+                </div>
+                <button class="resetKeyBtn" id="RESET-${tool.name}">🔄</button>
+                <button class="changeKeyBtn" "id="CHANGE-${tool.name}">🔧</button>
             </td>
         </tr>`);
 
         table.append(tableRow);
 
-        const input = $('input', tableRow);
-        const modsElement = $('span', tableRow);
-        input.on('keydown', e => {
-            e.preventDefault();
+        const keysContainer = $('.toolKeys', tableRow);
+        const changeBtn = $('.changeKeyBtn', tableRow);
+        const resetBtn = $('.resetKeyBtn', tableRow);
 
-            if (!e.code || e.code === 'ControlLeft' || e.code === 'AltLeft') return
+        changeBtn.on('click', () => {
+            if (globals.lockInputs) return;
+            globals.lockInputs = true;
 
-            const altUsed = e.altKey;
-            const ctrlUsed = e.ctrlKey;
+            keysContainer.html('<span>...</span>');
 
-            let key = '';
+            let clearFade = reverseFade(tableRow[0]);
+            const onkeydown = e => {
+                e.preventDefault();
+                e.stopPropagation();
 
-            modsElement.text('');
-            if (altUsed) {
-                modsElement.text('ALT + ');
-                key += 'ALT+'
-            }
-            if (ctrlUsed) {
-                modsElement.text(modsElement.text() + 'CTRL + ');
-                key += 'CTRL+'
-            }
-            key += e.code;
-            input.val(e.code);
+                redrawToolKeys(e);
 
-            // removing same values
-            for (let _tool of Object.values(tools)) {
-                if (tool.name != _tool.name && _tool.key == key) {
-                    $('#MODS-' + _tool.name).text('')
-                    $('#KEY-' + _tool.name).val('')
+                const code = getEventKeyCode(e);
+                if (isNormalKey(code) || isMouseKey(code)) {
+                    globals.toolManager.changeKey(tool, stringifyKeyEvent(e));
                 }
             }
+            document.addEventListener('keydown', onkeydown);
+            document.addEventListener('pointerdown', onkeydown);
 
-            globals.toolManager.changeKey(tool, key);
-        });
-        input.on('keyup', e => {
-            e.preventDefault();
-            if (!e.code || e.code === 'ControlLeft' || e.code === 'AltLeft') return
+            const onkeyup = e => {
+                const isMouse = isMouseKey(getEventKeyCode(e));
+                if (!isMouse && !e.code || e.code === 'ControlLeft' || e.code === 'AltLeft') return;
 
-            // saving ALL key binds
-            let toSave = {};
+                e.preventDefault();
+                e.stopPropagation();
 
-            for (const tool of Object.values(tools)) {
-                if (!tool.key) continue;
+                cleanup();
 
-                toSave[tool.name] = tool.key;
+                globals.toolManager.saveBinds();
             }
 
-            setLS('keyBinds', JSON.stringify(toSave));
+            document.addEventListener('keyup', onkeyup);
+            document.addEventListener('pointerup', onkeyup);
+
+            function cleanup() {
+                clearFade?.call();
+                document.removeEventListener('keydown', onkeydown);
+                document.removeEventListener('pointerdown', onkeydown);
+                document.removeEventListener('keyup', onkeyup);
+                document.removeEventListener('pointerup', onkeyup);
+
+                globals.lockInputs = false;
+            }
         });
+
+        resetBtn.on('click', () => {
+            if (globals.lockInputs) return;
+
+            redrawToolKeys(decodeKey(tool.defaultKey));
+
+            globals.toolManager.changeKey(tool, tool.defaultKey);
+            globals.toolManager.saveBinds();
+        })
+
+        function redrawToolKeys(key) {
+            const alt = key.alt ?? key.altKey;
+            const ctrl = key.ctrl ?? key.ctrlKey;
+
+            const keyCode = getEventKeyCode(key);
+
+            keysContainer.html('');
+
+            if (alt) {
+                keysContainer.append('<kbd>ALT</kbd> + ');
+            }
+            if (ctrl) {
+                keysContainer.append('<kbd>CTRL</kbd> + ');
+            }
+
+            if (isNormalKey(keyCode)) {
+                keysContainer.append(`<kbd>${keyCode}</kbd>`);
+            } else if (isMouseKey(keyCode)) {
+                const img = `<img src="${mouseKeys[keyCode]}"/>`
+                keysContainer.append(`<kbd>${img}</kbd>`);
+            }
+        }
+
+        function isNormalKey(code) {
+            return code && !code.startsWith('Control') && !code.startsWith('Alt') && !isMouseKey(code)
+        }
+
+        function isMouseKey(code) {
+            return Object.keys(mouseKeys).includes(code);
+        }
 
         const parsed = decodeKey(tool.key);
 
-        modsElement.text((parsed.alt ? 'ALT + ' : '') + (parsed.ctrl ? 'CTRL + ' : ''));
-
-        input.val(parsed.code);
+        redrawToolKeys(parsed);
     }
 
     $(keysWin.body).append(table);
@@ -206,18 +384,18 @@ export function keyBinds() {
 
 export function uiSettings() {
     const setWin = new Window({
-        title: capitalize(translate('ui settings')),
+        title: capitalize(t('ui settings')),
         center: true
     });
     if (!setWin.created) return;
 
     const table = generateTable([
-        [translate('colors size'), '<input type="range" min="16", max="64" step="1" id="colSize"><div style="width:50px;"><div>'],
-        [translate('hide emojis'), '<input type="checkbox" id="toggleEmojis">'],
-        [translate('emoji list'), '<input type="text" id="emojiList">'],
-        [`<button id="moreEmojis">${translate('super secret button')}</button>`],
-        [translate('show placed pixels'), '<input type="checkbox" id="togglePlaced">'],
-        [translate('show patterns over the palette'), '<input type="checkbox" id="showPatterns">']
+        [t('colors size'), '<input type="range" min="16", max="64" step="1" id="colSize"><div style="width:50px;"><div>'],
+        [t('hide emojis'), '<input type="checkbox" id="toggleEmojis">'],
+        [t('emoji list'), '<input type="text" id="emojiList">'],
+        [`<button id="moreEmojis">${t('super secret button')}</button>`],
+        [t('show placed pixels'), '<input type="checkbox" id="togglePlaced">'],
+        [t('show patterns over the palette'), '<input type="checkbox" id="showPatterns">']
     ]);
     $(setWin.body).append(table);
 
@@ -248,7 +426,7 @@ export function uiSettings() {
     })
 
     $('#moreEmojis').on('click', () => {
-        const w = new Window(translate('more emojis!'));
+        const w = new Window(t('more emojis!'));
         if (!w.created) return;
 
         w.body.innerHTML = '😁😂😃😄😅😆😉😊😋😌😍😏😒😓😔😖😘😚😜😝😞😠😡😢😣😤😥😨😩😪😫😭😰😱😲😳😵😷😸😹😺😻😼😽😾😿🙀🙅🙆🙇🙈🙉🙊🙋🙌🙍🙎🙏✂✅✈✉✊✋✌✏✒✔✖✨✳✴❄❇❌❎❓❔❕❗❤➕➖➗➡➰🚀🚃🚄🚅🚇🚉🚌🚏🚑🚒🚓🚕🚗🚙🚚🚢🚤🚥🚧🚨🚩🚪🚫🚬🚭🚲🚶🚹🚺🚻🚼🚽🚾🛀Ⓜ🅰🅱🅾🅿🆎🆑🆒🆓🆔🆕🆖🆗🆘🆙🆚🈁🈂🈚🈯🈲🈳🈴🈵🈶🈷🈸🈹🈺🉐🉑©®‼⁉™ℹ↔↕↖↗↘↙↩↪⌚⌛⏩⏪⏫⏬⏰⏳▪▫▶◀◻◼◽◾☀☁☎☑☔☕☝☺♈♉♊♋♌♍♎♏♐♑♒♓♠♣♥♦♨♻♿⚓⚠⚡⚪⚫⚽⚾⛄⛅⛎⛔⛪⛲⛳⛵⛺⛽⤴⤵⬅⬆⬇⬛⬜⭐⭕〰〽㊗㊙🀄🃏🌀🌁🌂🌃🌄🌅🌆🌇🌈🌉🌊🌋🌌🌏🌑🌓🌔🌕🌙🌛🌟🌠🌰🌱🌴🌵🌷🌸🌹🌺🌻🌼🌽🌾🌿🍀🍁🍂🍃🍄🍅🍆🍇🍈🍉🍊🍌🍍🍎🍏🍑🍒🍓🍔🍕🍖🍗🍘🍙🍚🍛🍜🍝🍞🍟🍠🍡🍢🍣🍤🍥🍦🍧🍨🍩🍪🍫🍬🍭🍮🍯🍰🍱🍲🍳🍴🍵🍶🍷🍸🍹🍺🍻🎀🎁🎂🎃🎄🎅🎆🎇🎈🎉🎊🎋🎌🎍🎎🎏🎐🎑🎒🎓🎠🎡🎢🎣🎤🎥🎦🎧🎨🎩🎪🎫🎬🎭🎮🎯🎰🎱🎲🎳🎴🎵🎶🎷🎸🎹🎺🎻🎼🎽🎾🎿🏀🏁🏂🏃🏄🏆🏈🏊🏠🏡🏢🏣🏥🏦🏧🏨🏩🏪🏫🏬🏭🏮🏯🏰🐌🐍🐎🐑🐒🐔🐗🐘🐙🐚🐛🐜🐝🐞🐟🐠🐡🐢🐣🐤🐥🐦🐧🐨🐩🐫🐬🐭🐮🐯🐰🐱🐲🐳🐴🐵🐶🐷🐸🐹🐺🐻🐼🐽🐾👀👂👃👄👅👆👇👈👉👊👋👌👍👎👏👐👑👒👓👔👕👖👗👘👙👚👛👜👝👞👟👠👡👢👣👤👦👧👨👩👪👫👮👯👰👱👲👳👴👵👶👷👸👹👺👻👼👽👾👿💀💁💂💃💄💅💆💇💈💉💊💋💌💍💎💏💐💑💒💓💔💕💖💗💘💙💚💛💜💝💞💟💠💡💢💣💤💥💦💧💨💩💪💫💬💮💯💰💱💲💳💴💵💸💹💺💻💼💽💾💿📀📁📂📃📄📅📆📇📈📉📊📋📌📍📎📏📐📑📒📓📔📕📖📗📘📙📚📛📜📝📞📟📠📡📢📣📤📥📦📧📨📩📪📫📮📰📱📲📳📴📶📷📹📺📻📼🔃🔊🔋🔌🔍🔎🔏🔐🔑🔒🔓🔔🔖🔗🔘🔙🔚🔛🔜🔝🔞🔟🔠🔡🔢🔣🔤🔥🔦🔧🔨🔩🔪🔫🔮🔯🔰🔱🔲🔳🔴🔵🔶🔷🔸🔹🔺🔻🔼🔽🕐🕑🕒🕓🕔🕕🕖🕗🕘🕙🕚🕛🗻🗼🗽🗾🗿😀😇😈😎😐😑😕😗😙😛😟😦😧😬😮😯😴😶🚁🚂🚆🚈🚊🚍🚎🚐🚔🚖🚘🚛🚜🚝🚞🚟🚠🚡🚣🚦🚮🚯🚰🚱🚳🚴🚵🚷🚸🚿🛁🛂🛃🛄🛅🌍🌎🌐🌒🌖🌗🌘🌚🌜🌝🌞🌲🌳🍋🍐🍼🏇🏉🏤🐀🐁🐂🐃🐄🐅🐆🐇🐈🐉🐊🐋🐏🐐🐓🐕🐖🐪👥👬👭💭💶💷📬📭📯📵🔀🔁🔂🔄🔅🔆🔇🔉🔕🔬🔭🕜🕝🕞🕟🕠🕡🕢🕣🕤🕥🕦🕧'
@@ -272,7 +450,7 @@ export function uiSettings() {
 
 export function gameSettings() {
     const win = new Window({
-        title: capitalize(translate('game settings')),
+        title: capitalize(t('game settings')),
         center: true
     });
     if (!win.created) return;
@@ -282,11 +460,11 @@ export function gameSettings() {
 
     const table = generateTable([
         [
-            translate('show protected'),
+            t('show protected'),
             `<input type="checkbox" id="showProtected" ${game.showProtected ? 'checked' : ''}>`
         ],
         [
-            translate('brush size'),
+            t('brush size'),
             `<input type="checkbox" id="customBrushSize" ${player.brushSize > 1 ? 'checked' : ''}>
             <input id="brushSize" type="range" value="${player.brushSize}" ` +
             `${player.brushSize == 1 ? 'disabled' : ''} min="2" ` +
@@ -294,27 +472,23 @@ export function gameSettings() {
             `<span id="brushSizeCounter">${player.brushSize - 1}<span>`
         ],
         [
-            translate('max saved pixels'),
+            t('max saved pixels'),
             `<input id="savePixelsInp" type="number" min="0" value="${player.maxPlaced}" style="width:4rem">`
         ],
         [
-            translate('disable chat colors'),
+            t('disable chat colors'),
             `<input type="checkbox" id="disableChatColors" ${chat.colorsEnabled ? '' : 'checked'}>`
         ],
         [
-            translate('chat messages limit'),
+            t('chat messages limit'),
             `<input type="number" id="chatLimit" value="${game.chatLimit}" title="maximum messages in chat">`
         ],
         [
-            translate('light grid'),
-            `<input type="checkbox" id="lightGridCB" ${tools.grid.isLight ? 'checked' : ''} title="will grid be light?">`
-        ],
-        [
-            translate('enable grid'),
+            t('enable grid'),
             `<input type="checkbox" id="enableGridCB" ${tools.grid.state == 1 ? 'checked' : ''}>`
         ],
         [
-            translate('draw line length'),
+            t('draw line length'),
             `<input type="checkbox" id="drawLineLenCB" ${tools.line.drawLength ? 'checked' : ''} title="draw line length near it">`
         ],
     ]);
@@ -331,7 +505,6 @@ export function gameSettings() {
         const use = e.target.checked;
 
         if (use) {
-            // TODO thing below does not work
             $('#brushSize').removeAttr('disabled');
             updateBrush($('#brushSize').val());
         } else {
@@ -369,14 +542,6 @@ export function gameSettings() {
         game.chatLimit = value;
     });
 
-    $('#lightGridCB').on('change', e => {
-        const checked = e.target.checked;
-
-        setLS('lightGrid', checked.toString());
-
-        tools.grid.isLight = checked;
-    });
-
     $('#enableGridCB').on('change', e => {
         const checked = e.target.checked;
 
@@ -397,21 +562,21 @@ export function gameSettings() {
 
 export async function captchaModal() {
     let win = new Window({
-        title: translate('Captcha'),
+        title: t('Captcha'),
         center: true,
         closeable: false
     });
 
     if (win.created) {
         const [help, cont, inp] = $(
-            `<div>${translate('Case insensitive, 0/o i/l are same')}. <a href="#">${translate('Can\'t recognize?')}</a></div>` +
+            `<div>${t('Case insensitive, 0/o i/l are same')}. <a href="#">${t('Can\'t recognize?')}</a></div>` +
             '<div class="captchaContainer"></div>' +
             '<input class="fullWidthInput" type="text"></input>'
         );
 
         help.children[0].onclick = captchaModal;
 
-        const [line] = $(`<div style="display:flex;justify-content:center">${translate('Captcha').toUpperCase()}:&nbsp;&nbsp;</div>`);
+        const [line] = $(`<div style="display:flex;justify-content:center">${t('Captcha').toUpperCase()}:&nbsp;&nbsp;</div>`);
         line.appendChild(inp);
 
         win.body.appendChild(help)
@@ -456,18 +621,19 @@ export async function captchaModal() {
 
 export function toolsWindow() {
     const toolWin = new Window({
-        title: capitalize(translate('tools')),
+        title: capitalize(t('tools')),
         center: true
     });
     if (!toolWin.created) return;
 
     const tableArr = [
-        [`<a href="/convert" target="_blank">${translate('convert image into palette')}</a>`],
-        [`<button id="screenshot">${translate('save canvas')}</button>`]
+        [`<a href="/convert" target="_blank">${t('convert image into palette')}</a>`],
+        [`<button id="screenshot">${t('save canvas')}</button>`],
+        [`<button id="showPrevWipes">${t('tools.showPrevWipesBtn')}</button>`]
     ]
 
-    if(me.role >= ROLE.MOD){
-        tableArr.unshift([`<button id="searchUsersB">${translate('search users')}</button>`])
+    if (me.role >= ROLE.MOD) {
+        tableArr.unshift([`<button id="searchUsersB">${t('search users')}</button>`])
     }
 
     const table = generateTable(tableArr);
@@ -475,18 +641,18 @@ export function toolsWindow() {
 
     $('#searchUsersB', table).on('click', () => {
         const win = new Window({
-            title: capitalize(translate('search users')),
+            title: capitalize(t('search users')),
             center: true
         });
         if (!win.created) return;
 
         const table = generateTable([
-            [`<input type="text" placeholder="nickname" id="userSearchText" max="32" style="width:250px"> ${translate('OR')} ` +
+            [`<input type="text" placeholder="nickname" id="userSearchText" max="32" style="width:250px"> ${t('OR')} ` +
                 '<input type="text" placeholder="id" id="userSearchId" max="32" style="width:50px">' +
-                `<input type="checkbox" id="searchIsBanned"><label for="searchIsBanned">${translate('banned?')}</label>`],
+                `<input type="checkbox" id="searchIsBanned"><label for="searchIsBanned">${t('banned?')}</label>`],
             ['<div id="searchUsersBody">']
         ]);
-        console.log(table)
+
         $(win.body).append(table);
 
         const input = $('#userSearchText');
@@ -572,11 +738,47 @@ export function toolsWindow() {
     });
 
     $('#screenshot').on('click', makeScreenshot);
+
+    $('#showPrevWipes').on('click', () => {
+        const wipesWin = new Window({
+            title: capitalize(t('prevWipesWinTitle'))
+        });
+        if (!wipesWin.created) return;
+
+        wipesWin.body.style.maxHeight = '200px';
+
+        if (!globals.mobile) {
+            wipesWin.moveTo(
+                toolWin.right + 5,
+                toolWin.top
+            );
+        } else {
+            wipesWin.moveToCenter();
+        }
+
+        const createWipeRow = function (wipeName) {
+            return [`<button data-name="${wipeName}" class="showWipeBtn">${wipeName}</button>`];
+        }
+        const table = generateTable(Object.keys(wipes).map(createWipeRow));
+        $(wipesWin.body).append(table);
+
+        $('.showWipeBtn', wipesWin.body).on('click', el => {
+            const name = el.target.dataset.name;
+            showHistoryCanvas(name);
+        });
+
+        const oldCloseFunc = wipesWin.close;
+        wipesWin.close = (...args) => {
+            unloadHistoryCanvas();
+
+            oldCloseFunc.call(wipesWin, ...args);
+        }
+    })
 }
 
 export function authWindow() {
     const win = new Window({
-        title: capitalize(translate('LOG IN')),
+        title: capitalize(t('LOG IN')),
         center: true
     });
     if (!win.created) return;
@@ -584,194 +786,139 @@ export function authWindow() {
     const tableArr = [
         [`<a href="/api/auth/vk"><img src="${vkLogo}" class="authLogo">VK</a>`],
         [`<a href="/api/auth/discord"><img src="${dsLogo}" class="authLogo">DISCORD</a>`],
-        [`<a href="/api/auth/facebook"><img src="${fbLogo}" class="authLogo">FACEBOOK</a>`]
+        [`<a href="/api/auth/google"><img src="${ggLogo}" class="authLogo">GOOGLE</a>`]
     ]
 
     const table = generateTable(tableArr);
 
     $('td', table).css('text-align', 'left');
     $('a', table).css('margin-left', '15px');
-    
+
     $(win.body).append(table);
 }
 
-function createCollapsibleBlock(title, bodyHtml, collapsed = true) {
-    const head = $('<div>');
-    head[0].style.cssText =
-        `width: 100%;
-    height: 30px;
-    background-color: #5f5f5f;
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    user-select: none;
-    cursor: pointer`
-
-    head.append(`<div style="font-size:20px;text-transform:uppercase;">${title}</div>`)
-
-    const arrow = $('<div>');
-    arrow[0].style.cssText =
-        `position: absolute;
-    top: 50%;
-    transform: translate(0, -50%);
-    left: 5px;
-    background-image: url(${arrowSvg});
-    background-size: 100%;
-    background-repeat: no-repeat;
-    transition: transform .2s ease-in-out;
-    width: 20px;
-    height: 20px;`
-
-    head.append(arrow);
-
-    const body = $('<div>');
-    body[0].style.cssText =
-        `max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s linear;
-    font-size: 20px;`
-
-    const innerBody = $('<div>');
-    innerBody[0].style.cssText =
-        `padding:8px`
-    innerBody.html(bodyHtml);
-
-    body.append(innerBody);
-
-    const headBodyContainer = $('<div>');
-    headBodyContainer[0].style.cssText =
-        `margin-bottom: 1px;`
-    headBodyContainer.append(head, body)
-
-    let state = 0; // 0 - closed, 1 - opened
-    function toggle() {
-        if (state) {
-            arrow.css('transform', 'translate(0px, -50%) rotate(0deg)');
-            body.css('max-height', 0);
-        } else {
-            arrow.css('transform', 'translate(0px, -50%) rotate(180deg)');
-            body.css('max-height', $(body)[0].scrollHeight);
-        }
-
-        // becomes true/false analog
-        state = !state;
-    }
-    if (!collapsed) setTimeout(toggle);
-
-    head.on('click', toggle);
-
-    return headBodyContainer
-}
 
 export function help() {
     const helpWin = new Window({
-        title: translate('help'),
+        title: t('help'),
         center: true
     });
     if (!helpWin.created) return;
 
-    helpWin.body.style.width = '90vw'
-    helpWin.body.style.height = '90vh'
+    helpWin.body.style.maxWidth = '800px';
+    helpWin.body.style.width = '90vw';
+    helpWin.body.style.height = '90vh';
+
+    const desktopIconMacro = `<img class="smallSvgIcon" src="${desktopIcon}">`;
+    const mobileIconMacro = `<img class="smallSvgIcon" src="${mobileIcon}">`;
 
     // TODO move this to translations
-    const intro = createCollapsibleBlock(translate('intro.introHeader'),
-        `<div style="width:100%;text-align:center;"><img src="./img/goroxels.png" style="vertical-align: middle;">${translate('intro.desc')}</div><br><br>
-    ${translate('intro.desc2')}<br>
-    ${translate('intro.desc3')}`, false);
+    const intro = createCollapsibleBlock(t('intro.introHeader'),
+        `<div style="width:100%;text-align:center;"><img src="./img/goroxels.png" style="vertical-align: middle;">${t('intro.desc')}</div><br><br>
+    ${t('intro.desc2')}`, false);
 
-    const howto = createCollapsibleBlock(translate('how to play?'),
+    const howto = createCollapsibleBlock(t('how to play?'),
         `<div style="display:inline-flex">
-            <div>${translate('intro.howToPlayDecs')}</div>
+            <div>${t('intro.howToPlayDecs')}</div>
             <div style="padding-left: 10px;">
+                <div class="desktop">
                 <video autoplay loop muted style="height:196px"><source src="./video/clickerMouse.webm" type="video/webm"></video>
+                </div>
+                <div class="mobile">
+                <video autoplay loop muted style="height:196px"><source src="./video/phoneDrawing.mp4" type="video/mp4"></video>
+                </div>
             </div>
-        </div>`, false);
+        </div>`);
 
-    const tools = createCollapsibleBlock(translate('tools'),
-        `${translate('intro.toolsDecs')}<br><br>
+    const tools = createCollapsibleBlock(t('tools'),
+        `${t('intro.toolsDecs')}<br><br>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.toolsClicker')}<br><br></div>
+        <div>${desktopIconMacro}${mobileIconMacro}${t('intro.toolsClicker')}<br><br></div>
         <div class="desktop">
             <video autoplay loop muted style="height:196px"><source src="./video/clicker.webm" type="video/webm"></video>
         </div>
     </div><br>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.toolsAS')}<br><br></div>
+        <div>${desktopIconMacro}${t('intro.toolsAS')}<br><br></div>
         <div class="desktop">
             <video autoplay loop muted style="height:196px"><source src="./video/as.webm" type="video/webm"></video>
         </div>
     </div><br>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.toolC')}<br><br></div>
+        <div>${desktopIconMacro}${t('intro.toolC')}<br><br></div>
         <div class="desktop">
             <video autoplay loop muted style="height:196px"><source src="./video/toolC.webm" type="video/webm"></video>
         </div>
     </div><br>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.brush')}<br><br></div>
+        <div>${desktopIconMacro}${mobileIconMacro}${t('intro.brush')}<br><br></div>
         <div class="desktop">
             <video autoplay loop muted style="height:196px"><source src="./video/brush2.webm" type="video/webm"></video>
         </div>
     </div><br>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.line')}<br><br></div>
+        <div>${desktopIconMacro}${mobileIconMacro}${t('intro.line')}<br><br></div>
         <div class="desktop">
             <video autoplay loop muted style="height:196px"><source src="./video/line.webm" type="video/webm"></video>
         </div>
     </div><br>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.flood')}<br><br></div>
+        <div>${desktopIconMacro}${mobileIconMacro}${t('intro.flood')}<br><br></div>
         <div class="desktop">
             <video autoplay loop muted style="height:196px"><source src="./video/flood.webm" type="video/webm"></video>
         </div>
     </div><br>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.grid')}<br><br></div>
+        <div>${desktopIconMacro}${mobileIconMacro}${t('intro.grid')}<br><br></div>
         <div class="desktop">
             <img src="./img/unavailable.png" style="height:196px">
         </div>
     </div><br>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.ctrlZ')}<br><br></div>
+        <div>${desktopIconMacro}${mobileIconMacro}${t('intro.ctrlZ')}<br><br></div>
         <div class="desktop">
             <video autoplay loop muted style="height:196px"><source src="./video/ctrlZ.webm" type="video/webm"></video>
         </div>
     </div><br>
-    ${translate('intro.resetColors')}<br>`);
+    ${desktopIconMacro}${mobileIconMacro}${t('intro.resetColors')}<br>`);
 
-    const tools2 = createCollapsibleBlock(translate('intro.tools2header'),
-        `<div style="width:100%;text-align:center;"><b>${translate('intro.tools2desc')}</b></div><br><br>
-    ${translate('intro.toolsHiders')}<br><br>
-    ${translate('intro.multicol')}<br>
-    ${translate('intro.multicol2')}<br>
-    ${translate('intro.multicol3')}<br><br>
-    ${translate('intro.sendCoords')}<br><br>
-    ${translate('intro.templateTools')}<br>`);
+    const tools2 = createCollapsibleBlock(t('intro.tools2header'),
+        `<div style="width:100%;text-align:center;"><b>${t('intro.tools2desc')}</b></div><br><br>
+    ${desktopIconMacro}${t('intro.toolsHiders')}<br><br>
+    ${desktopIconMacro}${mobileIconMacro}${t('intro.multicol')}<br>
+    ${t('intro.multicol2')}<br>
+    ${t('intro.multicol3')}<br><br>
+    ${desktopIconMacro}${t('intro.sendCoords')}<br><br>
+    ${desktopIconMacro}${t('intro.templateTools')}<br>`);
 
-    const template = createCollapsibleBlock(translate('template'),
-        `<div style="width:100%;text-align:center;"><b>${translate('intro.templateIntro')}</b></div><br><br>
-    ${translate('intro.templateDesc')}<br><br>
-    ${translate('intro.templateDescConvert')}<br><br>
+    const template = createCollapsibleBlock(t('template'),
+        `<div style="width:100%;text-align:center;"><b>${t('intro.templateIntro')}</b></div><br><br>
+    ${t('intro.templateDesc')}<br><br>
+    ${t('intro.templateDescConvert')}<br><br>
+    <div class="helpWithVideoCont mobile">
+        <video autoplay loop muted style="height:196px"><source src="./video/patternDemo.webm" type="video/webm"></video>
+    </div>
     <div class="helpWithVideoCont">
-        <div>${translate('intro.templateDescReminder')}<br><br></div>
+        <div>${t('intro.templateDescReminder')}<br><br></div>
         <div class="desktop">
             <video autoplay loop muted style="height:196px"><source src="./video/patternDemo.webm" type="video/webm"></video>
         </div>
     </div><br>`);
 
-    const author = createCollapsibleBlock(translate('intro.authorHeader'),
-        `${translate('intro.authorText')}<br>
-        ${translate('intro.authorContacts')}<br>
+    const author = createCollapsibleBlock(t('intro.authorHeader'),
+        `${t('intro.authorText')}<br>
+        ${t('intro.authorContacts')}<br>
+        ${t('intro.telegram_channel')}: <a href="https://t.me/goroxels">t.me/goroxels</a><br>
+        ${t('intro.my_boosty')} <a href="https://boosty.to/gorox">https://boosty.to/gorox</a>
         <div style="text-align:center"><img src="./img/3rdcf.png" title="ТРЕТЬЯ КОНФА"></div>`);
 
 
     $(helpWin.body).append(intro, howto, tools, tools2, template, author);
 }
 
-export function onlineViewWindow(json){
+export function onlineViewWindow(json) {
     let win = new Window({
-        title: capitalize(translate('online')),
+        title: capitalize(t('online')),
         center: true,
         closeable: true
     });
@@ -785,8 +932,8 @@ export function onlineViewWindow(json){
 
     const tableArr = [];
     Object.keys(json).forEach(key => {
-        if(key === 'TOTAL'){
-            win.updateTitle(translate('online') + ` (${json[key]})`, true);
+        if (key === 'TOTAL') {
+            win.updateTitle(t('online') + ` (${json[key]})`, true);
             return;
         }
 
@@ -801,3 +948,115 @@ export function onlineViewWindow(json){
     $('*', win.body).remove();
     $(win.body).append(table);
 }
+
+export function templatesWindow(templatesJson) {
+    let win = new Window({
+        title: capitalize(t('templates_title')),
+        center: true,
+        closeable: true
+    });
+
+    if (!win.created) {
+        return;
+    }
+
+    win.body.classList.add('templatesBody');
+    win.body.style.maxWidth = 'min(495px, 90vw)'; // 5 items
+    if (globals.mobile) {
+        win.body.style.justifyContent = 'space-evenly';
+    }
+
+    const templatesJsonSorted = templatesJson
+        .slice()
+        .sort((a, b) => {
+            const aIsMine = me.id === a.userId;
+            const bIsMine = me.id === b.userId;
+
+            if (aIsMine !== bIsMine) {
+                return aIsMine ? 1 : -1;
+            }
+
+            return new Date(a.createdAt) - new Date(b.createdAt);
+        });
+
+    const meAdmin = me.role === ROLE.ADMIN;
+    for (const tempJson of templatesJsonSorted) {
+        const meOwner = me.id === tempJson.userId;
+        const canDelete = meOwner || meAdmin;
+
+        const templateThumbLink = `api/template/img?t=thumb&f=${tempJson.thumb}`;
+
+        const templateEl = $(
+            `<div class="templateItem ${meOwner ? 'myTemplateItem' : ''}">
+                <button class="templateBtn ${canDelete ? 'deleteBtn' : ''}"></button>
+                <button class="templateBtn infoBtn">i</button>
+                <img src="${templateThumbLink}" alt="thumbnail">
+                <div class="templateName">${tempJson.name}</div>
+            </div>`
+        );
+
+        $(win.body).prepend(templateEl);
+
+        templateEl.find('.deleteBtn').on('click', async e => {
+            e.stopPropagation();
+
+            new ConfirmModal(t('confirm_template_deletion'), async (confirmed) => {
+                if (!confirmed) return;
+                const resp = await apiRequest(`/template/del?name=${encodeURIComponent(tempJson.name)}`, { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    templateEl.remove();
+                }
+            })
+        });
+
+        templateEl.find('.infoBtn').on('click', async e => {
+            e.stopPropagation();
+
+            let ownerName = '???';
+            try {
+                const resp = await apiRequest(`/userInfo?id=${tempJson.userId}`);
+                const data = await resp.json();
+                if (data && data.name) {
+                    ownerName = htmlspecialchars(data.name);
+                }
+            } catch (e) {
+                console.error('Ошибка получения userInfo', e);
+            }
+
+            const isMine = me.id === tempJson.userId;
+            const createdDate = new Date(tempJson.createdAt).toLocaleString();
+
+            const infoWin = new Window({
+                title: capitalize(t('template_info')),
+                center: true,
+                closeable: true
+            });
+
+            if (!infoWin.created) return;
+
+            infoWin.body.style.width = '280px';
+            infoWin.body.innerHTML = `
+                <ul class="templateInfoList">
+                    <li><b>${t('name')}:</b> ${tempJson.name}</li>
+                    <li><b>${t('createdAt')}:</b> ${createdDate}</li>
+                    <li><b>${t('owner')}:</b> ${ownerName}</li>
+                    <li><b>${t('isMine')}:</b> ${isMine ? t('yes') : t('no')}</li>
+                    <li><b>${t('public')}:</b> ${tempJson.public ? t('yes') : t('no')}</li>
+                </ul>
+            `;
+        });
+
+
+        templateEl.on('click', () => {
+            let imgLink = `GRX/f=${tempJson.file}`;
+            if (tempJson.origWidth) {
+                imgLink += `&w=${tempJson.origWidth}`;
+            }
+
+            urlInput.val(imgLink);
+            updateTemplate();
+        })
+    }
+}
+

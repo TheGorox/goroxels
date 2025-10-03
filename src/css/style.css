@@ -43,8 +43,11 @@ input[type=number] {
     min-height: 45px;
     height: 127px;
     border-bottom: 3px solid var(--primary);
+    padding-top: 3px;
     background-color: var(--dark);
     scrollbar-width: thin;
+
+    color-scheme: dark;
 }
 
 #chatLog {
@@ -181,8 +184,8 @@ input[type=number] {
         right: 50px;
         background-image: url(../img/chat.svg);
     }
-    
-    .showChat-notify{
+
+    .showChat-notify {
         background-image: url(../img/chat-notif.svg);
     }
 
@@ -379,6 +382,7 @@ body {
     position: relative;
 }
 
+
 .paletteColor.dark {
     border-color: white;
 }
@@ -399,6 +403,30 @@ body {
     z-index: 1;
 }
 
+.paletteColor.patternColor.selected {
+    border: unset !important;
+    outline: 2px solid white;
+}
+
+.paletteColor.patternColor.selectedSecond {
+    border: unset !important;
+    outline: 2px solid crimson;
+}
+
+/* patterns */
+.paletteColor>img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    image-rendering: pixelated;
+    width: inherit;
+
+    user-select: none;
+    pointer-events: none;
+}
+
+/* mobile */
 #tools {
     position: absolute;
     top: 5px;
@@ -420,6 +448,38 @@ body {
 
 .toolContainer.selected {
     box-shadow: 0 0 3px 0 black inset;
+}
+
+/* PC, tools window */
+kbd {
+    /* glory to HF */ 
+    padding: .1em .6em;
+    border: 1px solid #5a5a5a;
+    font-size: 11px;
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #333;
+    color: #d2d2d2;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .1), 0 0 0 2px #404040 inset;
+    border-radius: 3px;
+    display: inline-block;
+    margin: 0 .1em;
+    text-shadow: 0 1px 0 #404040;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+/* mouse btn icon */
+kbd > img {
+    height: 17px;
+    display: flex;
+}
+
+.toolKeys {
+    display: inline;
+}
+
+.changeKeyBtn, .resetKeyBtn {
+    float: right;
 }
 
 #topMenu, a, a:visited, .window, #modMenu {
@@ -469,7 +529,13 @@ body {
 
 .columnTable {
     width: 100%;
+
+    /* making margin between rows, 
+    but temoving top and bottom most margins */
+    border-collapse: separate;
     border-spacing: 0 3px;
+    margin-top: -3px;
+
     /* полу-костыль */
     font-weight: bold;
     /* костыль */
@@ -620,11 +686,14 @@ input[type=range]::-moz-range-thumb {
     position: absolute;
     padding: 5px;
     background-color: #404040;
-    border-width: 1px;
-    border-style: outset;
     z-index: 6;
     min-width: max-content;
+
+    border: 1px solid #555 !important;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
+
 
 .windowBody {
     /* min-width: 50vw; */
@@ -639,6 +708,8 @@ input[type=range]::-moz-range-thumb {
     padding: 3px;
     font-size: 13px;
     overflow: auto;
+
+    border-radius: 6px;
 }
 
 .windowHeader {
@@ -653,16 +724,25 @@ input[type=range]::-moz-range-thumb {
     -moz-user-select: none;
     -webkit-user-select: none;
     position: relative;
+
+    border-bottom: 1px solid #555;
 }
 
 .windowHeader>.closeWindow {
-    height: 25px;
-    width: 25px;
     position: absolute;
-    top: 3px;
-    right: 3px;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    top: 5px;
+    right: 5px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.windowHeader>.closeWindow:hover {
+    opacity: 1;
 }
 
 .windowHeader>.closeWindow>div {
@@ -702,20 +782,25 @@ input[type=range]::-moz-range-thumb {
     overflow: hidden;
     border-radius: 3px;
 }
-#chatChannels > div {
+
+#chatChannels>div {
     cursor: pointer;
-    
+
     padding: 2px 5px;
     background-color: var(--lighten);
     color: var(--very-light-text);
 }
-#chatChannels > div.selected {
+
+#chatChannels>div.selected {
     background-color: var(--light);
 }
 
 #chatNick {
     text-align: center;
-    word-break: break-word;
+
+    text-overflow: ellipsis;
+    max-width: 125px;
+    overflow: hidden;
 }
 
 #hideChat {
@@ -1069,6 +1154,10 @@ table .authLogo {
     }
 }
 
+.smallSvgIcon {
+    max-height: 17px;
+}
+
 .roleBadge {
     height: 24px;
     vertical-align: middle;
@@ -1143,3 +1232,249 @@ table .authLogo {
 textarea {
     padding: 1px;
 }
+
+.chatNotif {
+    width: 15px;
+    height: 15px;
+    position: absolute;
+    transform: translate(-1px, -26px);
+    border-radius: 50%;
+
+    display: none;
+}
+
+.chatNotif.active {
+    display: block;
+
+    background-color: red;
+    opacity: 0.3;
+}
+
+.badges>img {
+    image-rendering: pixelated;
+}
+
+/* USERWINDOW BADGES */
+.badgesContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #2d2d2d;
+    border: 1px solid #4c4c4c;
+    border-radius: 8px;
+    padding: 3px 5px;
+    overflow: hidden;
+    gap: 5px;
+}
+
+.badgesList {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #555 #333;
+    flex: 1;
+}
+
+.badgesList::-webkit-scrollbar {
+    height: 6px;
+}
+
+.badgesList::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 3px;
+}
+
+.badgesList::-webkit-scrollbar-track {
+    background-color: #333;
+}
+
+.badge {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border: 1px solid #666;
+    border-radius: 4px;
+    background: #222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    image-rendering: pixelated;
+}
+
+.badge:hover {
+    border-color: #aaa;
+    background: #444;
+}
+
+.badge img {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
+.addBadgeBtn {
+    flex: 0 0 auto;
+    border: 1px solid #666;
+    background: #333;
+    color: #ccc;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    font-size: 16px;
+    line-height: 18px;
+    padding: 0;
+    cursor: pointer;
+}
+
+.addBadgeBtn:hover {
+    background: #444;
+    border-color: #aaa;
+    color: white;
+}
+
+/* templates */
+.templatesBody {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 5px;
+    justify-content: flex-start;
+
+    user-select: none;
+}
+
+.templateItem {
+    position: relative;
+    width: 90px;
+    padding: 24px 4px 6px 4px;
+    border-radius: 8px;
+    background-color: #3a3a3a;
+    text-align: center;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.templateItem img {
+    width: 50px;
+    height: 50px;
+    border-radius: 4px;
+    display: block;
+    margin: 0 auto 4px;
+}
+
+.templateName {
+    font-size: 12px;
+    color: var(--light-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.myTemplateItem {
+    background-color: #555;
+    border: 1px solid #77cc77;
+}
+
+.templateBtn {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 50%;
+    font-size: 11px;
+    line-height: 16px;
+    text-align: center;
+    cursor: pointer;
+    color: #fff;
+    padding: 0;
+}
+
+.deleteBtn {
+    top: 3px;
+    right: 3px;
+    background: #555 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='white' viewBox='0 0 24 24'><path d='M18.3 5.71L12 12l6.3 6.29-1.42 1.42L12 13.41l-6.29 6.3-1.42-1.42L10.59 12 4.29 5.71 5.71 4.29 12 10.59l6.29-6.3z'/></svg>") no-repeat center;
+    background-size: 12px 12px;
+}
+
+.deleteBtn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.infoBtn {
+    top: 3px;
+    left: 3px;
+    font-weight: bold;
+    background: #666;
+}
+
+.templateInfoList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    color: var(--light-text);
+}
+
+.templateInfoList li {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.templateInfoList li:last-child {
+    border-bottom: none;
+}
+
+.templateInfoList b {
+    display: inline-block;
+    min-width: 90px;
+    color: #ccc;
+}
+
+/* new template tab styles */
+#templateX, #templateY {
+    max-width: 120px;
+}
+
+/* mobile move button */
+.coordsTd {
+    position: relative;
+}
+
+#manualMoveBtn {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.55);
+    border: 1px solid #4c4c4c;
+    border-radius: 50%;
+    color: var(--light-text);
+    cursor: pointer;
+    transition: background-color .15s, transform .15s;
+
+    /* ugly bluish highlight */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+#manualMoveBtn.active {
+    background-color: #555;
+    transform: translateY(-50%) scale(1.05);
+    background-color: #4b3800;
+    border-color: gold;
+    color: gold;
+}
+

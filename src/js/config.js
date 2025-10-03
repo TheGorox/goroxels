@@ -71,3 +71,27 @@ export function callOnLoad(cb){
     if(downloaded) return cb();
     toCall.push(cb);
 }
+
+// the same as above but in the Promise format
+export async function resolveWhenConfigDownloaded() {
+    if (downloaded) {
+        return;
+    } else {
+        return new Promise(res => {
+            const int = setInterval(() => {
+                if (downloaded) {
+                    clearInterval(int);
+                    res();
+                }
+            }, 10);
+        })
+    }
+}
+
+export function showProtected(show = true) {
+    game.showProtected = show;
+    globals.chunkManager.chunks.forEach(chunk => {
+        chunk.needRender = true;
+    });
+    globals.renderer.needRender = true;
+}

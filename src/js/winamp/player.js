@@ -1,17 +1,18 @@
-import PcmPlayer from './PcmPlayer';
 import { getLS, setLS } from '../utils/localStorage';
 import { loadImage } from '../utils/misc';
 import globals from '../globals';
 import { boardToScreenSpace, screenToBoardSpace } from '../utils/conversions';
 import { FX } from '../fxcanvas';
-import { clamp, map } from '../utils/math';
+import { clamp, mapRange } from '../utils/math';
 import camera from '../camera';
 import player from '../player';
-import { apiRequest } from '../actions';
 
 import winampFontPng from '../../font/pixel/winamp.png';
 import winampFontDesc from '../../font/pixel/winamp.txt';
 import { PixelFont } from '../tools';
+
+import startBtnImg from '../../img/winamp/enableRadioBtn.png';
+import { apiRequest } from '../utils/api';
 
 
 async function importMaterials() {
@@ -54,14 +55,99 @@ function restoreColors() {
     player.switchSecondColor(tempColors[1]);
 }
 
+export function initRadio() {
+    const player = new WinampPlayer();
+    player.init();
+    window.wPlayer = player;
+}
+
+let documentClicked = false, onDocumentClickCallbacks = [];
+document.addEventListener('click', () => {
+    documentClicked = true;
+
+    onDocumentClickCallbacks.forEach(cb => cb());
+    onDocumentClickCallbacks.length = 0;
+})
+
+export async function createRadioStarterBtn() {
+    const btnImg = await loadImage(startBtnImg);
+    const bW = btnImg.width;
+    const bH = btnImg.height;
+
+    const bX = -btnImg.width - 5;
+    const bY = 0;
+
+    function renderBtn(ctx) {
+        const z = camera.zoom;
+        const [canvasX, canvasY] = boardToScreenSpace(bX, bY);
+
+        if (this.needRender)
+            this.redraw();
+
+        ctx.save();
+        ctx.scale(z, z);
+        ctx.drawImage(btnImg, canvasX / z, canvasY / z);
+        ctx.restore();
+
+        return 1;
+    }
+
+    let btnFx = new FX(renderBtn);
+    globals.fxRenderer.add(btnFx, 2);
+
+    let mousedownAt = 0, listeners = [];
+    function onMousedown(e) {
+        const boardPos = screenToBoardSpace(e.clientX, e.clientY);
+        if (checkIsButtonPos(...boardPos)) {
+            mousedownAt = Date.now();
+        }
+    }
+
+    async function onMouseup(e) {
+        const boardPos = screenToBoardSpace(e.clientX, e.clientY);
+        if (checkIsButtonPos(...boardPos)) {
+            if (Date.now() - mousedownAt < 500) {
+                await onBtnClick();
+            }
+        }
+    }
+
+    globals.eventManager.on('mousedown', onMousedown);
+    globals.eventManager.on('mouseup', onMouseup);
+
+    listeners.push(['mousedown', onMousedown]);
+    listeners.push(['mouseup', onMouseup]);
+
+    function removeBtn() {
+        if (btnFx) {
+            globals.fxRenderer.remove(btnFx);
+            btnFx = null;
+        }
+        for (const [ev, fn] of listeners) {
+            globals.eventManager.off(ev, fn);
+        }
+        listeners = [];
+    }
+
+    async function onBtnClick() {
+        removeBtn();
+
+        initRadio();
+    }
+
+    function checkIsButtonPos(x, y) {
+        return x >= bX && x < bX + bW && y >= bY && y < bY + bH;
+    }
+}
+
 class WinampPlayer {
     constructor() {
         this.canvas = document.createElement('canvas');
         this.ctx = this.canvas.getContext('2d');
 
-        this.playerPosition = JSON.parse(getLS('winamp.position', true) || '[0,0]');
+        this.playerPosition = JSON.parse(getLS('winamp.position', true) || '[-275,0]');
         this.sndBalance = 0; // -1; 1
-        this.volumeLvl = +(getLS('winamp.volume', true) || '0.001'); // 0; 1
+        this.volumeLvl = +(getLS('winamp.volume', true) || '0.5'); // 0; 1
 
         this.queue = null;
         this.currentTrack = null;
@@ -69,162 +155,206 @@ class WinampPlayer {
         this.images = null;
         this.needRender = true;
 
-        this.pcmPlayer = null;
+        this.startPolling();
 
         this.config = {
             width: 275,
             height: 348,
-
             headerRect: new UIRect(2, 2, 262, 12),
             closeBtnRect: new UIRect(265, 4, 7, 7),
             volumeBoundsRect: new UIRect(108, 61, 63, 4),
             soundBalanceBoundsRect: new UIRect(178, 61, 35, 4),
-
-            // needs calculation
             volumeSliderRect: new UIRect(-1, -1, -1, -1),
             balanceSliderRect: new UIRect(-1, -1, -1, -1),
-
             titleRect: new UIRect(111, 24, 155, 12),
-
             kbpsRect: new UIRect(111, 41, 16, 10),
             khzRect: new UIRect(156, 41, 11, 10),
-
-            // big mm:ss clock
             mm1Rect: new UIRect(48, 26, 9, 13),
             mm2Rect: new UIRect(60, 26, 9, 13),
             ss1Rect: new UIRect(78, 26, 9, 13),
             ss2Rect: new UIRect(90, 26, 9, 13),
-
             progressSliderBndRect: new UIRect(16, 72, 249, 10),
-
             queueBoxRect: new UIRect(18, 257, 238, 48)
         }
 
         this._cache = {};
-
         this._holdingButton = null;
         this._lastHoldPos = null;
-
         this._destroyed = false;
         this.noFeed = false;
-
         this.title = null;
         this.visibleTitle = null;
+
+        this._boundHandlers = {};
+        this._socketHandlers = {};
     }
 
-    rebuildPcmPlayer(sampleRate) {
-        if (this.pcmPlayer) {
-            this.pcmPlayer.destroy();
-        }
+    addAudioStoppedListeners() {
+        this.audio.addEventListener("pause", () => {
+            // controls are disabled, but you can still
+            // press "pause/play" button and it will stop
+            // the player. this is not good because the 
+            // whole radio will be screwed
+            if (!this.audio._destroyed) {
+                this.audio.play().catch(err => {
+                    console.warn("Resume blocked until user interaction:", err);
+                });
+            }
+        });
 
-        this.pcmPlayer = new PcmPlayer({
-            inputCodec: 'Int16',
-            channels: 2,
-            sampleRate,
-            flushTime: 2000
-        })
+        this.audio.addEventListener("stalled", () => {
+            console.warn("Stream stalled");
+            this.restartStream();
+        });
 
-        this.pcmPlayer.volume(this.volumeLvl);
-        this.pcmPlayer.balance(this.sndBalance);
+        this.audio.addEventListener("error", (e) => {
+            console.error("Audio error", e);
+            this.restartStream();
+        });
+
+        this.audio.addEventListener("ended", () => {
+            console.warn("Stream ended");
+            this.restartStream();
+        });
     }
 
     async init() {
+        setLS('radioLover', '1');
+
         await this.loadMaterials();
         this.recalculateButtons();
         this.initTouchControls();
-
         this.setTitle('Goroxels Radio 1.0 alpha');
 
         this.canvas.width = this.config.width;
         this.canvas.height = this.config.height;
 
-        globals.fxRenderer.add(new FX(this.render.bind(this)), 2);
+        this._fx = new FX(this.render.bind(this));
+        globals.fxRenderer.add(this._fx, 2);
 
         await this.updateSong();
-        await this.updateQueue();
         this.startPolling();
 
-        globals.socket.on('radio', type => {
-            switch(type){
-                case 0:
-                    this.updateSong();
-                case 1:
-                    this.updateQueue();
+        // socket handlers
+        this._socketHandlers.radio = (type) => {
+            switch (type) {
+                case 0: this.updateSong(); break;
+                case 1: this.updateQueue(); break;
             }
-        });
-
-        globals.socket.on('opened', () => {
+        };
+        this._socketHandlers.opened = () => {
             this.updateSong();
-            this.updateQueue();
-        })
+        };
+
+        globals.socket.on('radio', this._socketHandlers.radio);
+        globals.socket.on('opened', this._socketHandlers.opened);
 
         this.ackRender();
         this.initAutoRender();
     }
 
+    volume(val) {
+        this.volumeLvl = val;
+        this.gainNode.gain.value = val;
+        setLS('winamp.volume', val.toString(), true);
+    }
+
+    balance(val) {
+        this.sndBalance = val;
+        this.pannerNode.pan.value = val;
+    }
+
+
     initAutoRender() {
-        setInterval(() => {
-            this.ackRender();
-        }, 1000);
+        setInterval(() => this.ackRender(), 1000);
     }
 
     initTouchControls() {
-        globals.eventManager.on('mousedown', e => {
-            if(this._destroyed) return;
-
-            if (e.gesture) return mouseup(e);
-
-            mousedown(e);
-        });
-        globals.eventManager.on('mouseup', e => {
-            if(this._destroyed) return;
-
-            mouseup(e);
-        });
-        globals.eventManager.on('mousemove', e => {
-            if(this._destroyed) return;
-
-            if (e.gesture) return;
-
-            mousemove(e);
-        });
-
         const self = this;
 
         function mousedown(e) {
             if (self._holdingButton) mouseup(e);
-
-
             let obj = self.getObjectAtPosition(e.clientX, e.clientY);
             if (obj) {
                 preserveColors();
-
                 camera.disableMove();
-
                 self.onObjMousedown.call(self, obj, e);
                 self._lastHoldPos = screenToBoardSpace(e.clientX, e.clientY);
             }
         }
         function mouseup(e) {
             self._lastHoldPos = null;
-
             camera.enableMove();
-
             if (self._holdingButton) {
                 self.onObjMouseup.call(self, self._holdingButton, e);
-
                 self._holdingButton = false;
-
                 setTimeout(restoreColors);
             }
         }
         function mousemove(e) {
             if (self._holdingButton) {
                 self.onObjMousemove.call(self, self._holdingButton, e);
-
                 self._lastHoldPos = screenToBoardSpace(e.clientX, e.clientY);
             }
         }
+
+        this._boundHandlers.mousedown = (e) => {
+            if (this._destroyed) return;
+            if (e.gesture) return mouseup(e);
+            mousedown(e);
+        };
+        this._boundHandlers.mouseup = (e) => {
+            if (this._destroyed) return;
+            mouseup(e);
+        };
+        this._boundHandlers.mousemove = (e) => {
+            if (this._destroyed) return;
+            if (e.gesture) return;
+            mousemove(e);
+        };
+
+        globals.eventManager.on('mousedown', this._boundHandlers.mousedown);
+        globals.eventManager.on('mouseup', this._boundHandlers.mouseup);
+        globals.eventManager.on('mousemove', this._boundHandlers.mousemove);
+    }
+
+    close() {
+        setLS('radioLover', '0');
+
+        if (this.audio) {
+            this.audio._destroyed = true;
+            this.audio.pause();
+            this.audio.src = "";
+            this.audio.remove();
+        }
+
+        if (this.audioCtx) {
+            this.audioCtx.close();
+        }
+
+        clearTimeout(this.__pollTimeout);
+        clearInterval(this._titleRollerInterval);
+        globals.fxRenderer.remove(this._fx);
+
+        // remove eventManager handlers
+        if (this._boundHandlers) {
+            globals.eventManager.off('mousedown', this._boundHandlers.mousedown);
+            globals.eventManager.off('mouseup', this._boundHandlers.mouseup);
+            globals.eventManager.off('mousemove', this._boundHandlers.mousemove);
+            this._boundHandlers = {};
+        }
+
+        // remove socket handlers
+        if (this._socketHandlers) {
+            globals.socket.off('radio', this._socketHandlers.radio);
+            globals.socket.off('opened', this._socketHandlers.opened);
+            this._socketHandlers = {};
+        }
+
+        this._destroyed = true;
+
+
+        createRadioStarterBtn();
     }
 
     getObjectAtPosition(screenX, screenY) {
@@ -250,9 +380,9 @@ class WinampPlayer {
         this._holdingButton = obj;
     }
     onObjMouseup(obj, e) {
-        switch(obj){
+        switch (obj) {
             case this.config.closeBtnRect: {
-                if(this.getObjectAtPosition(e.clientX, e.clientY) === this.config.closeBtnRect){
+                if (this.getObjectAtPosition(e.clientX, e.clientY) === this.config.closeBtnRect) {
                     this.close();
                 }
             }
@@ -284,11 +414,7 @@ class WinampPlayer {
                 this.config.volumeSliderRect.y = clampedY;
 
                 const newValue = this.mapHrSliderPos(clampedX, bndRect, sliderImg, 0, 1);
-                this.volumeLvl = newValue;
-
-                this.pcmPlayer.volume(this.volumeLvl);
-
-                setLS('winamp.volume', this.volumeLvl.toString(), true);
+                this.volume(newValue);
 
                 this.ackRender();
 
@@ -307,9 +433,7 @@ class WinampPlayer {
                 this.config.balanceSliderRect.y = clampedY;
 
                 const newValue = this.mapHrSliderPos(clampedX, bndRect, sliderImg, -1, 1);
-                this.sndBalance = newValue;
-
-                this.pcmPlayer.balance(this.sndBalance);
+                this.balance(newValue);
 
                 this.ackRender();
 
@@ -334,7 +458,7 @@ class WinampPlayer {
         const minPosX = bndRect.x;
         const maxPosX = bndRect.x + bndRect.w - sliderImg.width;
 
-        const mappedVal = map(posX, minPosX, maxPosX, minValue, maxValue);
+        const mappedVal = mapRange(posX, minPosX, maxPosX, minValue, maxValue);
         return mappedVal;
     }
 
@@ -343,7 +467,7 @@ class WinampPlayer {
         const minPosX = bndRect.x;
         const maxPosX = bndRect.x + bndRect.w - sliderImg.width;
 
-        const mappedPosX = map(value, minValue, maxValue, minPosX, maxPosX);
+        const mappedPosX = mapRange(value, minValue, maxValue, minPosX, maxPosX);
         return mappedPosX | 0;
     }
 
@@ -393,12 +517,12 @@ class WinampPlayer {
     }
 
     render(ctx) {
-        if(this._destroyed) return 2;
+        if (this._destroyed) return 2;
 
         const [x, y] = boardToScreenSpace(this.playerPosition[0], this.playerPosition[1]);
         const z = camera.zoom;
 
-        if(this.needRender)
+        if (this.needRender)
             this.redraw();
 
         ctx.save();
@@ -418,11 +542,31 @@ class WinampPlayer {
         ].slice(0, 7);
 
         const str = queue.map(s => {
-            let title = s.title;
-            if(title.length > 42){
-                title = title.slice(0, 42-3) + '...';
+            let title = cutTextToWidth(s.title, 190);
+            return `${s.id ?? 'x'}. ${title} <${s.duration / 60 | 0}:${pad2(s.duration % 60 | 0)}>`
+
+            function cutTextToWidth(text, maxWidth) {
+                let curWidth = 0;
+                let curText = '';
+                for (const ch of text) {
+                    // every dot is 3px wide
+                    if (curWidth >= maxWidth - 9) {
+                        curText += '...';
+                        break;
+                    }
+
+                    if (ch === ' ' || /[А-я]/.test(ch)) curWidth += 5;
+                    else if (/[A-z]/.test(ch)) curWidth += 4;
+                    else if (ch === '.') curWidth += 2;
+                    else curWidth += 4;
+
+                    curWidth += 1;
+
+                    curText += ch;
+                }
+
+                return curText;
             }
-            return `${s.id}. ${title} <${s.duration / 60 | 0}:${pad2(s.duration % 60 | 0)}>`
         }).join('\n');
 
         return str;
@@ -463,14 +607,14 @@ class WinampPlayer {
 
         // this shit eats a lot of cpu
         const queueText = this.generateQueueText();
-        if(queueText && queueText !== this._cache.queueText){
+        if (queueText && queueText !== this._cache.queueText) {
             const qTextImg = this.fonts.winamp.drawText(queueText, '#00E200');
-            if(qTextImg){
+            if (qTextImg) {
                 this._cache.queueTextImg = qTextImg;
                 this._cache.queueText = queueText;
                 this.ctx.drawImage(qTextImg, this.config.queueBoxRect.x, this.config.queueBoxRect.y);
             }
-        }else if(queueText){
+        } else if (queueText) {
             this.ctx.drawImage(this._cache.queueTextImg, this.config.queueBoxRect.x, this.config.queueBoxRect.y);
         }
     }
@@ -490,7 +634,7 @@ class WinampPlayer {
         const smallSliderHeight = this.images.hrSlider.height;
 
         const volRect = this.config.volumeBoundsRect;
-        const volSliderX = map(this.volumeLvl, 0, 1, volRect.x, (volRect.x + volRect.w) - smallSliderWidth);
+        const volSliderX = mapRange(this.volumeLvl, 0, 1, volRect.x, (volRect.x + volRect.w) - smallSliderWidth);
         const volSliderY = ((volRect.y + volRect.h / 2) - smallSliderHeight / 2) + 1
 
         this.config.volumeSliderRect.x = volSliderX | 0;
@@ -499,7 +643,7 @@ class WinampPlayer {
         this.config.volumeSliderRect.h = smallSliderHeight;
 
         const balRect = this.config.soundBalanceBoundsRect;
-        const balSliderX = map(this.sndBalance, -1, 1, balRect.x, (balRect.x + balRect.w) - smallSliderWidth);
+        const balSliderX = mapRange(this.sndBalance, -1, 1, balRect.x, (balRect.x + balRect.w) - smallSliderWidth);
         const balSliderY = ((balRect.y + balRect.h / 2) - smallSliderHeight / 2) + 1
 
         this.config.balanceSliderRect.x = balSliderX | 0;
@@ -508,82 +652,89 @@ class WinampPlayer {
         this.config.balanceSliderRect.h = smallSliderHeight;
     }
 
-    close() {
-        this.pcmPlayer.destroy();
+    initAudioChain() {
+        if (!this.audioCtx || this.audioCtx.state === "closed") {
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
 
-        clearTimeout(this.__pollTimeout);
-        clearInterval(this._titleRollerInterval);
+        this.gainNode = this.audioCtx.createGain();
+        this.gainNode.gain.value = this.volumeLvl;
 
+        this.pannerNode = this.audioCtx.createStereoPanner();
+        this.pannerNode.pan.value = this.sndBalance;
 
-        this._destroyed = true;
+        if (this.audio) {
+            try { this.audio._destroyed = true; } catch { }
+            try { this.audio.pause(); } catch { }
+            try { this.audio.remove(); } catch { }
+        }
+
+        this.audio = document.createElement("audio");
+        this.audio.autoplay = true;
+        this.audio.controls = false;
+        this.audio._destroyed = false;
+
+        this.addAudioStoppedListeners();
+
+        const srcNode = this.audioCtx.createMediaElementSource(this.audio);
+        srcNode.connect(this.gainNode).connect(this.pannerNode).connect(this.audioCtx.destination);
+    }
+
+    async startStream() {
+        if (this._destroyed) return;
+        if (this._streaming) return;
+
+        this._streaming = true;
+
+        const startFn = () => {
+            try {
+                if (!this.audio || this.audio._destroyed) {
+                    this.initAudioChain();
+                }
+
+                this.audio.src = `${location.protocol}//${location.hostname}/api/radio/stream`;
+                this.audio.autoplay = true;
+
+                const playPromise = this.audio.play();
+                if (playPromise) {
+                    playPromise.catch(err => console.warn("Playback blocked until user interaction:", err));
+                }
+            } catch (err) {
+                console.error("Failed to start stream:", err);
+                this._streaming = false;
+
+                if (!this._destroyed) {
+                    setTimeout(() => this.startStream(), 5000);
+                }
+            }
+        };
+
+        if (!documentClicked) {
+            onDocumentClickCallbacks.push(startFn);
+        } else {
+            startFn();
+        }
+    }
+
+    async restartStream() {
+        if (this._destroyed) return;
+        this._streaming = false;
+        console.info("Restarting radio stream...");
+        await this.startStream();
     }
 
     async startPolling() {
-        try {
-            const aborter = new AbortController();
-
-            const resp = await fetch(`${location.protocol}//${location.hostname}/api/radio/stream`, {
-                signal: aborter.signal
-            });
-            const reader = resp.body.getReader();
-
-            let acc = new Uint8Array();
-
-            while (1) {
-                if(this._destroyed) {
-                    aborter.abort('destroy');
-                };
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                // this fuck sometimes causes an error like "new Uint16array length should divide by 2 bla bla bla"
-                // i guess this is because of transmission issues, so let's workaround
-                if(value.length % 2 !== 0 || acc.length > 0){
-                    acc = joinByteArrays(acc, value);
-
-                    if(acc.length % 2 == 0){
-                        this.feed(acc.subarray());
-                        acc = new Uint8Array();
-                    }
-                }else{
-                    this.feed(value)
-                }
-            }
-
-            function joinByteArrays(arr1, arr2){
-                const mergedArray = new Uint8Array(arr1.length + arr2.length);
-                mergedArray.set(arr1);
-                mergedArray.set(arr2, arr1.length);
-
-                return mergedArray;
-            }
-        } catch (error) {
-            if(this._destroyed) return;
-
-            console.error('player stream ERRORed, restart in 1s');
-            clearTimeout(this.__pollTimeout);
-            this.__pollTimeout = setTimeout(this.startPolling.bind(this), 1000);
-            return;
-        }
-
-        console.warn('player stream stopped, restart in 10s');
-        clearTimeout(this.__pollTimeout);
-        this.__pollTimeout = setTimeout(this.startPolling.bind(this), 10000);
+        if (this._destroyed) return;
+        await this.startStream();
     }
 
-    feed(data) {
-        if (this.noFeed || !this.pcmPlayer) return;
-
-        this.pcmPlayer.feed(data);
-    }
 
     async updateSong() {
+        if (this._destroyed) return;
+
         this.noFeed = true;
 
         const song = await this.fetchCurTrack();
-        if (!this.currentTrack || this.currentTrack.sampleRate != song.sampleRate) {
-            this.rebuildPcmPlayer(song.sampleRate);
-        }
 
         this.currentTrack = song;
 
@@ -595,11 +746,13 @@ class WinampPlayer {
         this.noFeed = false;
 
         this.ackRender();
+
+        this.updateQueue().then(() => this.ackRender());
     }
 
-    async updateQueue(){
+    async updateQueue() {
         const queue = await this.fetchQueue();
-        if(!queue) return;
+        if (!queue) return;
 
         this.queue = queue;
         this.ackRender();
@@ -609,7 +762,7 @@ class WinampPlayer {
         const resp = await apiRequest('/radio/current-song');
         const json = await resp.json();
         if (!json.success) {
-            toastr.error('cannot fetch current song! reload the page.');
+            // toastr.error('cannot fetch current song! reload the page.');
             return
         }
 
@@ -620,7 +773,7 @@ class WinampPlayer {
         const resp = await apiRequest('/radio/get-queue');
         const json = await resp.json();
         if (!json.success) {
-            toastr.warn('cannot fetch song queue');
+            // toastr.warn('cannot fetch song queue');
             return
         }
 
@@ -652,5 +805,16 @@ class WinampPlayer {
 function pad2(num) {
     return num.toString().padStart(2, '0');
 }
+
+export function startWinampRadio() {
+    if (getLS('radioLover') === '1') {
+        initRadio();
+    } else {
+        createRadioStarterBtn();
+    }
+
+}
+
+
 
 export default WinampPlayer

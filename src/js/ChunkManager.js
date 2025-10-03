@@ -8,9 +8,9 @@ import {
 import {
     boardToChunk
 } from './utils/conversions'
-import { apiRequest } from './actions';
 import Pako from 'pako';
 import TempChunkPlaceholder from './TempChunkPlaceholder';
+import { apiRequest } from './utils/api';
 
 export default class ChunkManager {
     constructor() {
@@ -43,12 +43,22 @@ export default class ChunkManager {
         })
     }
 
+    clearChunks(){
+        this.chunks.clear();
+    }
+
     getChunkKey(x, y) {
         return x << 4 | y
     }
 
-    reloadChunks(){
-        this.test = true;
+    reloadChunks(chunksToReload){
+        if(!chunksToReload){
+            this.clearChunks();
+        }else{
+            for(const {x: cx, y: cy} of chunksToReload){
+                this.chunks.delete(this.getChunkKey(cx, cy));
+            }
+        }
         let loadQueue = [...this.chunks.values()];
         const interval = setInterval(() => {
             if(this.loadingChunks.size < 3){
@@ -67,7 +77,9 @@ export default class ChunkManager {
         if (globals.socket.connected && !this.loadingChunks.has(key) && this.loadingChunks.size < 5) {
             this.loadingChunks.add(key);
             // globals.socket.requestChunk(x, y);
-            apiRequest(`/getchunk?canvas=${canvasId}&x=${x}&y=${y}`).then(async (resp) => {
+            apiRequest(`/getchunk?canvas=${canvasId}&x=${x}&y=${y}`, {
+                credentials: 'omit'
+            }).then(async (resp) => {
                 
                 let key = this.getChunkKey(x, y);
                 if (this.loadingChunks.has(key)){

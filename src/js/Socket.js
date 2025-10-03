@@ -3,9 +3,7 @@ import pako from 'pako'
 
 import {
     OPCODES,
-    STRING_OPCODES,
-    unpackPixel,
-    packPixel
+    STRING_OPCODES
 } from './protocol';
 import {
     canvasId,
@@ -13,12 +11,12 @@ import {
 } from './config'
 import globals from './globals'
 import User from './user';
-import chat from './chat';
+import chat from './Chat';
 import { captchaModal } from './windows';
-import Window from './Window';
-import player from './player';
-import { updatePlaced } from './actions';
+import Window, { Modal } from './Window';
+import player, { updatePlaced } from './player';
 import { translate } from './translate';
+import { htmlspecialchars } from './utils/misc';
 
 export default class Socket extends EventEmitter {
     constructor(port) {
@@ -51,7 +49,7 @@ export default class Socket extends EventEmitter {
             this.emit('opened');
             console.log('Socket has been connected');
 
-            if(!this.connectedOnce) this.connectedOnce = true;
+            if (!this.connectedOnce) this.connectedOnce = true;
         }
 
         this.socket.onmessage = this.onmessage.bind(this);
@@ -66,11 +64,11 @@ export default class Socket extends EventEmitter {
             setTimeout(() => {
                 console.log('reconnect');
                 this.reconnect();
-            }, Math.random()*1000);
+            }, Math.random() * 1000);
         }
     }
 
-    close(){
+    close() {
         this.socket.close();
     }
 
@@ -111,22 +109,22 @@ export default class Socket extends EventEmitter {
                     userId,
                     id,
                     registered,
-                    role,
-                    badges
+                    role
                 } = decoded;
 
-                const badgesParsed = badges?.split('|').filter(x => x.length).map(x => +x);
-
                 let sameUser;
-                if(name){
+                if (name) {
                     sameUser = Object.values(globals.users).find(u => u.name === name);
                 }
 
-                if(sameUser){
+                if (sameUser) {
                     globals.users[id] = sameUser;
                     sameUser.newConnection(id);
-                }else{
-                    globals.users[id] = new User(name, id, userId, registered, role, badgesParsed);
+                } else {
+                    const user = globals.users[id] = new User(name, id, userId, registered, role);
+                    user.loadBadges()
+                        .then(user.updateBadges.bind(user))
+                        .catch(e => console.error('failed to load badges', e));
                 }
 
                 break
@@ -142,8 +140,8 @@ export default class Socket extends EventEmitter {
 
             case STRING_OPCODES.error: {
                 decoded.errors.forEach(error => {
-                    if(error === 'error.captcha'){
-                        if(!Window.Exists('Captcha'))
+                    if (error === 'error.captcha') {
+                        if (!Window.Exists('Captcha'))
                             captchaModal();
                     }
                     toastr.error(error, translate('Error from the Socket:'), {
@@ -162,10 +160,27 @@ export default class Socket extends EventEmitter {
 
             case STRING_OPCODES.alert: {
                 // todo нормальный попап
-                toastr.info(decoded.msg, 'ALERT', {
-                    timeOut: 1000*60*5,
-                    extendedTimeOut: 1000*60*5
-                })
+                if (decoded.type === 0) {
+                    toastr.info(decoded.msg, 'ALERT', {
+                        timeOut: 1000 * 60 * 5,
+                        extendedTimeOut: 1000 * 60 * 5
+                    });
+                } else {
+                    const safeMsg = htmlspecialchars(decoded.msg);
+                    const m = new Modal;
+                    m.init();
+                    const mBody = $(
+                        `<div style="margin:0;padding:5px;text-align:center;">
+                            <h1>ADMIN:</h1>
+                            <p>${safeMsg}</p>
+                            <button style="padding: 8px;">OK</button>
+                        </div>`)
+                    m.contEl.appendChild(mBody[0]);
+
+                    $('button', mBody).on('click', () => {
+                        m.close();
+                    });
+                }
                 break
             }
 
@@ -180,7 +195,8 @@ export default class Socket extends EventEmitter {
             }
 
             case STRING_OPCODES.reloadChunks: {
-                globals.chunkManager.reloadChunks();
+                const toReload = decoded.chunks;
+                globals.chunkManager.reloadChunks(toReload);
                 break
             }
         }
@@ -227,20 +243,20 @@ export default class Socket extends EventEmitter {
                 const isProtect = !!dv.getUint8(1),
                     uid = dv.getUint32(2, false);
                 let x, y, col;
-                for(let i = 6; i < dv.byteLength; i+=5){
+                for (let i = 6; i < dv.byteLength; i += 5) {
                     x = dv.getUint16(i);
-                    y = dv.getUint16(i+2);
-                    col = dv.getUint8(i+4);
-                    if(isProtect){
+                    y = dv.getUint16(i + 2);
+                    col = dv.getUint8(i + 4);
+                    if (isProtect) {
                         this.emit('protect', x, y, col);
-                    }else{
+                    } else {
                         this.emit('place', x, y, col, uid);
                     }
                 }
 
                 const user = globals.users[uid];
-                if(user) user.updateCoords(col, x, y);
-                
+                if (user) user.updateCoords(col, x, y);
+
                 break
             }
 
@@ -252,16 +268,16 @@ export default class Socket extends EventEmitter {
             case OPCODES.placeBatch: {
                 const PIXEL_LENGTH = 9;
 
-                const totalPixels = (dv.byteLength-1) / PIXEL_LENGTH;
-                if(totalPixels % 1 !== 0){
+                const totalPixels = (dv.byteLength - 1) / PIXEL_LENGTH;
+                if (totalPixels % 1 !== 0) {
                     console.warn('TotalPixels length is not integer');
                 }
 
-                for(let off = 1; off < dv.byteLength; off += PIXEL_LENGTH){
+                for (let off = 1; off < dv.byteLength; off += PIXEL_LENGTH) {
                     const x = dv.getUint16(off);
-                    const y = dv.getUint16(off+2);
-                    const c = dv.getUint8(off+4);
-                    const placerId = dv.getUint32(off+5);
+                    const y = dv.getUint16(off + 2);
+                    const c = dv.getUint8(off + 4);
+                    const placerId = dv.getUint32(off + 5);
 
                     this.onIncomingPixel([x, y, c], placerId);
                 }
@@ -276,13 +292,13 @@ export default class Socket extends EventEmitter {
         }
     }
 
-    onIncomingPixel([x, y, col], id){
+    onIncomingPixel([x, y, col], id) {
         const user = globals.users[id];
-        if(user) user.updateCoords(col, x, y);
+        if (user) user.updateCoords(col, x, y);
 
         const key = x + ',' + y;
         let timeout = this.pendingPixels[key];
-        if(timeout){
+        if (timeout) {
             clearTimeout(timeout);
             delete this.pendingPixels[key];
         }
@@ -290,7 +306,7 @@ export default class Socket extends EventEmitter {
         this.emit('place', x, y, col, id);
 
         // does not work, id is not player id
-        if(id === player.id)
+        if (id === player.id)
             updatePlaced(player.placedCount++);
     }
 
@@ -314,18 +330,18 @@ export default class Socket extends EventEmitter {
         this.socket.send(dv.buffer);
     }
 
-    sendPixels(pixels, isProtect=false) {
-        let dv = new DataView(new ArrayBuffer(6 + pixels.length*5))
+    sendPixels(pixels, isProtect = false) {
+        let dv = new DataView(new ArrayBuffer(6 + pixels.length * 5))
 
         dv.setUint8(0, OPCODES.pixels);
         dv.setUint8(1, isProtect ? 1 : 0); // isProtect
-        for(let i = 0; i < pixels.length; i++){
-            let offset = i*5 + 6;
+        for (let i = 0; i < pixels.length; i++) {
+            let offset = i * 5 + 6;
             const [x, y, col] = pixels[i];
 
             dv.setUint16(offset, x);
-            dv.setUint16(offset+2, y);
-            dv.setUint8(offset+4, col);
+            dv.setUint16(offset + 2, y);
+            dv.setUint8(offset + 4, col);
         }
 
         this.socket.send(dv.buffer)
@@ -339,7 +355,7 @@ export default class Socket extends EventEmitter {
         this.socket.send(dv.buffer);
     }
 
-    sendChatSubscribe(channel, isReconnect){
+    sendChatSubscribe(channel, isReconnect) {
         const packet = {
             c: STRING_OPCODES.subscribeChat,
             ch: channel,
@@ -349,27 +365,28 @@ export default class Socket extends EventEmitter {
         this.socket.send(JSON.stringify(packet));
     }
 
-    sendChatMessage(text, channel, whisper=false) {
+    sendChatMessage(text, channel, whisper = false) {
         const packet = {
             c: STRING_OPCODES.chatMessage,
             msg: text,
             ch: channel
         }
 
-        if(whisper) packet.whisper = whisper;
+        if (whisper) packet.whisper = whisper;
 
         this.socket.send(JSON.stringify(packet));
     }
 
-    sendChatWhisper(text, channel, whisperId){
+    sendChatWhisper(text, channel, whisperId) {
         return this.sendChatMessage(text, channel, whisperId);
     }
 
-    sendAlert(to, text){
+    sendAlert(to, text, isModal = false) {
         const packet = {
             c: STRING_OPCODES.alert,
             to,
-            msg: text
+            msg: text,
+            type: isModal ? 1 : 0
         }
 
         this.socket.send(JSON.stringify(packet));

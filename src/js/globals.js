@@ -27,5 +27,8 @@ export default {
         topMenu: $('#topMenu')[0],
         topMenuContent: $('#topMenu>.content')[0],
         chatInput: $('#chatInput')[0]
-    }
+    },
+
+    // to prevent tool usage due to rebinding
+    lockInputs: false
 }

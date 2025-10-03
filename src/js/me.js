@@ -1,5 +1,5 @@
-import { apiRequest } from './actions';
 import { ROLE } from './constants'
+import { apiRequest } from './utils/api';
 
 let loaded = false;
 let cbs = [];

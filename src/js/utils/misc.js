@@ -1,6 +1,7 @@
 import {
     boardWidth,
     boardHeight,
+    canvasName,
 } from '../config';
 import globals from '../globals';
 
@@ -40,7 +41,34 @@ export function decodeKey(str) {
     return config
 }
 
+export function getEventKeyCode(ev) {
+    let code;
+    if (ev instanceof PointerEvent || ev instanceof MouseEvent) {
+        switch (ev.button) {
+            case 0:
+                code = 'LMB';
+                break;
+            case 1:
+                code = 'MMB';
+                break;
+            case 2:
+                code = 'RMB';
+                break;
+            case 3:
+                code = '4MB';
+                break;
+            case 4:
+                code = '5MB';
+                break;
+        }
+    } else {
+        code = ev.code;
+    }
+    return code;
+}
 export function stringifyKeyEvent(ev) {
+    let code = getEventKeyCode(ev);
+
     let out = '';
     if (ev.altKey) {
         out += 'ALT+'
@@ -48,7 +76,7 @@ export function stringifyKeyEvent(ev) {
     if (ev.ctrlKey) {
         out += 'CTRL+'
     }
-    return out + ev.code
+    return out + code
 }
 
 export function calculateColumnSize() {
@@ -61,6 +89,8 @@ export function calculateColumnSize() {
 }
 
 export function htmlspecialchars(text) {
+    if(!text) return '';
+    
     return text
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -70,7 +100,7 @@ export function htmlspecialchars(text) {
 }
 
 export function getRecommendedColorSize() {
-    if(globals.mobile) return 24;
+    if (globals.mobile) return 24;
     const max = 30;
     const p = $('#palette');
     // 14 is for palette padding 
@@ -132,7 +162,7 @@ export function resizeCanvas(canvas, newWidth, newHeight) {
     return resizedCanvas;
 }
 
-export function loadImage(url){
+export function loadImage(url) {
     return new Promise((res, rej) => {
         const img = new Image();
         img.src = url;
@@ -140,4 +170,57 @@ export function loadImage(url){
         img.onerror = rej;
         img.onload = () => res(img);
     })
+}
+
+export function reverseFade(el) {
+    let reboundInt = setInterval(() => {
+        redrawFade();
+    }, 100);
+
+    const fadeCanvas = document.createElement('canvas');
+    const ctx = fadeCanvas.getContext('2d');
+
+    fadeCanvas.style.cssText =
+        `position: absolute;
+        z-index: 999`;
+
+    window.addEventListener('resize', onresize)
+    function onresize() {
+        fadeCanvas.width = window.innerWidth;
+        fadeCanvas.height = window.innerHeight;
+
+        redrawFade();
+    }
+    onresize();
+
+    function redrawFade() {
+        ctx.clearRect(0, 0, fadeCanvas.width, fadeCanvas.height);
+
+        ctx.fillStyle = 'black';
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(0, 0, fadeCanvas.width, fadeCanvas.height);
+
+        const bnds = el.getBoundingClientRect()
+
+        ctx.clearRect(bnds.x, bnds.y, bnds.width, bnds.height);
+    }
+
+    function clear() {
+        clearInterval(reboundInt);
+        window.removeEventListener('resize', onresize);
+        fadeCanvas.remove();
+    }
+
+    document.body.appendChild(fadeCanvas);
+
+    return clear;
+}
+
+export function makeScreenshot() {
+    const canvas = globals.chunkManager.dumpAll();
+
+    const link = document.createElement('a');
+    link.download = `GX ${canvasName} ${getPathsafeDate()}.png`;
+    link.href = canvas.toDataURL()
+    link.click();
 }

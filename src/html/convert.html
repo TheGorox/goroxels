@@ -20,7 +20,8 @@
                 <div class="folderChoose" id="palFolder" title="Choose folder...">
                     <img src="../img/folder.png" alt="[choose folder]">
                 </div>
-                <input type="text" id="palInput" data-translate="placeholder" placeholder="URL/file/clipboard" class="half">
+                <input type="text" id="palInput" data-translate="placeholder" placeholder="URL/file/clipboard"
+                    class="half">
                 <button id="palGOBtn" class="translate">GO!</button>
             </div>
             <div class="line">
@@ -34,9 +35,9 @@
                 </select>
             </div>
             <div class="line hidden" id="thresoldDiv">
-                    <span class="translate">Threshold</span>: <input type="number" id="palThresold" style="width: 42px;margin-left: 3px;" min="0" max="100"
-                    value="25" autocomplete="nope">
-                </div>
+                <span class="translate">Threshold</span>: <input type="number" id="palThresold"
+                    style="width: 42px;margin-left: 3px;" min="0" max="100" value="25" autocomplete="nope">
+            </div>
             <div class="line hidden" id="ordMatrix">
                 <span class="translate">Matrix size</span>&nbsp;
                 <select id="ordMatrixSelect" style="height: 24px;font-size: 12px;">
@@ -74,10 +75,38 @@
                 <span class="translate">constrast tune</span>
                 <button id="resetContrast" class="translate">reset</button>
             </div>
+            <div class="line resize hidden">
+                <label for="resizeXInput" class="translate">width</label>
+                <input type="number" id="resizeXInput" min="1" value="512">
+                <input type="range" id="resizeXRange" min="1" value="512" style="width: 100px;">
+                <button id="aspectRatioLock" class="aspectButton active"
+                    title="Включить/выключить фиксацию соотношения сторон">⛓️</button>
+            </div>
+
+            <div class="line resize hidden">
+                <label for="resizeYInput" class="translate">height</label>
+                <input type="number" id="resizeYInput" min="1" max="4096" value="512">
+                <input type="range" id="resizeYRange" min="1" max="4096" value="512" style="width: 100px;">
+                <div>
+                    <input type="checkbox" id="resizeAA">
+                    <label for="resizeAA" class="translate">anti-alias</label>
+                </div>
+
+            </div>
+
+            <div class="line">
+                <input type="checkbox" id="tryResizePixelArt">
+                <label for="tryResizePixelArt" class="translate">
+                    tryResizePixelArt
+                <label><br>
+            </div>
+            
+
+
             <div class="line">
                 <input type="checkbox" id="autoZoom">
                 <label for="autoZoom" class="translate">
-                    resize preview automatically
+                    zoom preview automatically
                 <label><br>
             </div>
 
@@ -85,8 +114,16 @@
                 <input type="checkbox" id="serp">
                 <label for="serp" class="translate">
                     serpentine (slightly suppresses dithering artefacts)
+                    <label><br>
+            </div>
+
+            <div class="line">
+                <input type="checkbox" id="doNotConvert">
+                <label for="doNotConvert" class="translate">
+                    doNOTconvert
                 <label><br>
             </div>
+
 
             <div class="line opaque">
                 <div id="palLB" class="loadingBar">
@@ -106,7 +143,8 @@
                 <div class="folderChoose" id="patFolder" title="Choose folder...">
                     <img src="../img/folder.png" alt="folder.png">
                 </div>
-                <input type="text" id="patInput" data-translate="placeholder" placeholder="URL/file/clipboard" class="half">
+                <input type="text" id="patInput" data-translate="placeholder" placeholder="URL/file/clipboard"
+                    class="half">
                 <button id="patGOBtn" class="translate">GO!</button>
             </div>
             <div class="line output" id="patOut"></div>

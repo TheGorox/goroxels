@@ -54,15 +54,17 @@ export default class TempChunkPlaceholder {
     _fromData(savedChunk){
         const canvas = document.createElement('canvas');
 
-        canvas.width = savedChunk.width;
-        canvas.height = savedChunk.height;
-
-        const ctx = canvas.getContext('2d');
-        
-        const imageData = ctx.createImageData(canvas.width, canvas.height);
-        imageData.data.set(savedChunk.data);
-
-        ctx.putImageData(imageData, 0, 0);
+        if(savedChunk){
+            canvas.width = savedChunk.width;
+            canvas.height = savedChunk.height;
+    
+            const ctx = canvas.getContext('2d');
+            
+            const imageData = ctx.createImageData(canvas.width, canvas.height);
+            imageData.data.set(savedChunk.data);
+    
+            ctx.putImageData(imageData, 0, 0);
+        }
 
         return resizeCanvas(canvas, chunkSize, chunkSize);
     }
