@@ -12,6 +12,8 @@ import Pako from 'pako';
 import TempChunkPlaceholder from './TempChunkPlaceholder';
 import { apiRequest } from './utils/api';
 
+const CHUNK_LOADING_THREADS = 5;
+
 export default class ChunkManager {
     constructor() {
         this.chunks = new Map();
@@ -48,7 +50,7 @@ export default class ChunkManager {
     }
 
     getChunkKey(x, y) {
-        return x << 4 | y
+        return x << 16 | y
     }
 
     reloadChunks(chunksToReload){
@@ -61,7 +63,7 @@ export default class ChunkManager {
         }
         let loadQueue = [...this.chunks.values()];
         const interval = setInterval(() => {
-            if(this.loadingChunks.size < 3){
+            if(this.loadingChunks.size < 1){
                 const chunk = loadQueue.pop();
                 if(!chunk){
                     return clearInterval(interval);
@@ -74,7 +76,7 @@ export default class ChunkManager {
     loadChunk(x, y) {
         let key = this.getChunkKey(x, y);
 
-        if (globals.socket.connected && !this.loadingChunks.has(key) && this.loadingChunks.size < 5) {
+        if (globals.socket.connected && !this.loadingChunks.has(key) && this.loadingChunks.size < CHUNK_LOADING_THREADS) {
             this.loadingChunks.add(key);
             // globals.socket.requestChunk(x, y);
             apiRequest(`/getchunk?canvas=${canvasId}&x=${x}&y=${y}`, {
