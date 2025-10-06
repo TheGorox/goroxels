@@ -39,6 +39,7 @@ const camera = {
 
     centerOn(x, y){
         globals.renderer.needRender = true;
+        globals.fxRenderer.needRender = true;
         if(this.noMoving) return;
         
         this.x = x - this.maxX;

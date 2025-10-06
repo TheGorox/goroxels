@@ -5,6 +5,7 @@ import {
     game
 } from './config'
 import protectedPatternUrl from '../img/protectedPattern.png';
+import { getLS } from './utils/localStorage';
 
 export default class Chunk {
     constructor(x, y, buffer) {
@@ -37,7 +38,15 @@ export default class Chunk {
                 (this.y * this.height) % this._protectedPattern.canvas.height
             ]
 
-            this.protectedPatternChunkSized = this._protectedPattern.createFilledCanvas(this.width, this.height, patternShift[0], patternShift[1]);
+            if(getLS('protectDebug') === '1'){
+                const canv = this.protectedPatternChunkSized = document.createElement('canvas');
+                canv.width = this.width; canv.height = this.height;
+                const canvCtx = canv.getContext('2d');
+                canvCtx.fillStyle = 'rgb(0,255,0)';
+                canvCtx.fillRect(0, 0, this.width, this.height);
+            }else{
+                this.protectedPatternChunkSized = this._protectedPattern.createFilledCanvas(this.width, this.height, patternShift[0], patternShift[1]);
+            }
         }
 
         this.pCanvas = document.createElement('canvas');
@@ -58,7 +67,11 @@ export default class Chunk {
             this.ctx.putImageData(this.imgData, 0, 0);
 
             if (game.showProtected) {
-                this.ctx.globalAlpha = 0.7;
+                if(getLS('protectDebug') === '1'){
+                    this.ctx.globalAlpha = 1;
+                }else{
+                    this.ctx.globalAlpha = 0.7;
+                }
 
                 this.pCtx.putImageData(this.pImgData, 0, 0);
                 if(this.protectedPatternChunkSized !== null){
