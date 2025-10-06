@@ -272,8 +272,9 @@ export default class User {
                 .split(', ')
                 .map(x => parseInt(x, 10));
 
-            if (Number.isInteger(x) && Number.isInteger(y))
+            if (Number.isInteger(x) && Number.isInteger(y)){
                 camera.centerOn(x, y);
+            }
         })
 
         usersContainer[0].appendChild(this.element[0]);

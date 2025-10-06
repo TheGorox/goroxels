@@ -1,4 +1,5 @@
 import { initChat, initMobileChatToggle } from "./Chat";
+import { initDraggableInputs } from "./draggableInputs";
 import globals from "./globals";
 import player from "./player";
 import { importTemplateFromUrl, initHandlers, initTemplateMobileMove, initTemplateMoveByMouse, loadValues } from "./template";
@@ -31,6 +32,8 @@ export function initOtherCoolFeatures() {
     initMenuResizer();
     showHelpIfFirstTime();
     startWinampRadio();
+
+    initDraggableInputs()
 }
 
 function initModMenu() {
