@@ -28,6 +28,7 @@ import { init as initTranslates, translate as t } from '../translate'
 import { processApiErrors } from '../utils/api';
 import { isImagePixelArt, resizeCanvas } from './resize';
 import { linkNumberRangeInputs, watchInput } from './dom';
+import { sleep } from '../utils/misc';
 initTranslates();
 
 let resizeKeepAspectRatio = true;
@@ -150,6 +151,7 @@ function tryParseUserPalette() {
 
 let paletteRGB = palettes['game.main'],
     paletteLAB,
+    paletteOKLab,
     palette32;
 
 let palUtils = {
@@ -163,22 +165,36 @@ let palUtils = {
     },
     updatePalette() {
         paletteLAB = paletteRGB.map(this.rgb2lab);
+        paletteOKLab = paletteRGB.map(clrManip.rgb2okLAB);
         palette32 = paletteRGB.map(this.rgb2uint32);
+
 
         this.ditherPalette();
     },
     ditherPalette() {
+        if($('#ditheringMode').val() !== 'check') return;
+
         // спи.. взято на вооружение!
         this.colorValuesExRGB = [];
         this.colorValuesExLab = [];
-        const threshold = +$('#palThresold').val() * 1.2; // UI is presented as a range of 0..100, but ciede2000 maxes out at ~120.
+        this.colorValuesExOkLab = [];
+
+        const isOklab = $('#colorfunc').val() === 'oklab';
+        const clrDiffFn = isOklab ? clrManip.mOklabDiff : clrManip.mciede2000;
+        const paletteWithL = isOklab ? paletteOKLab : paletteLAB;
+        // lab max diff is 120
+        // oklab max diff is ~1.509 
+        // but realistic max between oklab black/white is ~1.0
+        const thresMulti = isOklab ? 0.01 : 1.2
+
+        const threshold = +$('#palThresold').val() * thresMulti; // UI is presented as a range of 0..100, but ciede2000 maxes out at ~120.
         paletteRGB.forEach((col1, col1idx) => {
             paletteRGB.forEach((col2, col2idx) => {
                 if (col2idx >= col1idx) {
-                    if (clrManip.mciede2000(col1, col2) <= threshold) {
+                    if (clrDiffFn(col1, col2) <= threshold) {
                         const mix = clrManip.mixColors(col1, col2);
-                        const col1lab = paletteLAB[col1idx];
-                        const col2lab = paletteLAB[col2idx];
+                        const col1lab = paletteWithL[col1idx];
+                        const col2lab = paletteWithL[col2idx];
                         if (col1lab[0] >= col2lab[0]) { // put lighter colors first regardless of combo
                             this.colorValuesExRGB.push([mix[0], mix[1], mix[2], col1idx, col2idx]);
                         } else {
@@ -189,10 +205,19 @@ let palUtils = {
             });
         });
         this.colorValuesExRGB.forEach((val, idx) => {
-            this.colorValuesExLab[idx] = clrManip.rgb2lab(val);
-            this.colorValuesExLab[idx][3] = val[3];
-            this.colorValuesExLab[idx][4] = val[4];
+            if(isOklab){
+                this.colorValuesExOkLab[idx] = clrManip.rgb2okLAB(val.map(x => x | 0));
+                
+                this.colorValuesExOkLab[idx][3] = val[3];
+                this.colorValuesExOkLab[idx][4] = val[4];
+
+            }else{
+                this.colorValuesExLab[idx] = clrManip.rgb2lab(val);
+                this.colorValuesExLab[idx][3] = val[3];
+                this.colorValuesExLab[idx][4] = val[4];
+            }
         });
+        console.log(this.colorValuesExRGB.length);
     },
     ditherTypes: {
         //      X   7
@@ -261,20 +286,16 @@ let palUtils = {
                 deFunction = clrManip.mciede2000mix;
                 palette = paletteLAB;
                 break
-            case 'ciede2000cpp':
-                deFunction = convModule.mciede2000;
-                palette = paletteLAB;
-                break
-            case 'ciede2000cpp2':
-                deFunction = convModule.ciede2000;
-                palette = paletteLAB;
-                break
             case 'cmcic':
                 deFunction = clrManip.cmcicMix;
                 palette = paletteLAB;
                 break
             case 'eucl':
                 deFunction = clrManip.euclidian;
+                break
+            case 'oklab':
+                deFunction = clrManip.mOklabDiffMix;
+                palette = paletteOKLab;
                 break
         }
 
@@ -364,6 +385,10 @@ let palUtils = {
             case 'eucl':
                 deFunction = clrManip.euclidian;
                 break
+            case 'oklab':
+                deFunction = clrManip.mOklabDiffMix;
+                palette = this.colorValuesExOkLab;
+                break
         }
 
         const rowSize = width * 4;
@@ -436,6 +461,10 @@ let palUtils = {
                 break
             case 'eucl':
                 deFunction = clrManip.euclidian;
+                break
+            case 'oklab':
+                deFunction = clrManip.mOklabDiffMix;
+                palette = paletteOKLab;
                 break
         }
 
@@ -667,6 +696,8 @@ function startPaletteConverter(url) {
                 });
             return;
         }
+
+        palUtils.updatePalette();
 
         let convGen; // converterGenerator
         switch ($('#ditheringMode').val()) {
@@ -1021,10 +1052,6 @@ function downloadCanvas(canvas) {
     link.download = 'filename.png';
     link.href = canvas.toDataURL()
     link.click();
-}
-
-async function sleep(ms) {
-    return new Promise(res => setTimeout(res, ms));
 }
 
 async function showUploadPrompt(palettizedCanvas) {

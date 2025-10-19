@@ -1,5 +1,5 @@
 // Stolen and edited from pxlsfiddle
-var colorManip = {
+const colorManip = {
     // Turn a hex color string (without leading '#') into an RGB color array.
     hex2rgb(hex) {
         return [parseInt(hex.substr(0, 2), 16), parseInt(hex.substr(2, 2), 16), parseInt(hex.substr(4, 2), 16)];
@@ -506,7 +506,7 @@ var colorManip = {
     // As such, there's no specific formula code here, and coldist() can be called instead.
 
 
-    euclidian(rgb0, rgb1) {
+    euclidianRgb(rgb0, rgb1) {
         var rd = rgb1[0] - rgb0[0],
             gd = rgb1[1] - rgb0[1],
             bd = rgb1[2] - rgb0[2];
@@ -610,7 +610,96 @@ var colorManip = {
         }
 
         return imageData
+    },
+
+    _linearTable: null,
+    // lazy load lut
+    get linearTable() {
+        if (cm._linearTable === null) {
+            const linearTable = cm._linearTable = new Float32Array(256);
+            for (let i = 0; i < 256; i++) {
+                linearTable[i] = (i <= 10.31475)
+                    ? i / 3294.6
+                    : ((i / 269.025 + 0.0513) ** 2.4);
+            }
+        }
+        return cm._linearTable;
+    },
+
+    rgb2okLAB(rgb) {
+        // linearizing rgb colors
+        // it's just a LUT, nothing complicated
+        r = cm.linearTable[rgb[0]];
+        g = cm.linearTable[rgb[1]];
+        b = cm.linearTable[rgb[2]];
+
+        // RGB -> LMS
+        const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+        const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+        const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+
+        // delinearizing lms
+        // it's Math.cbrt but (hopefully) optimized for JIT 
+        const l_ = l ** (1 / 3);
+        const m_ = m ** (1 / 3);
+        const s_ = s ** (1 / 3);
+
+        // LMS -> OKLAB
+        return [
+            0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+            1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+            0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+        ];
+    },
+    okLAB2rgb(L, A, B) {
+        // OKLAB -> LMS
+        const l_ = L + 0.3963377774 * A + 0.2158037573 * B;
+        const m_ = L - 0.1055613458 * A - 0.0638541728 * B;
+        const s_ = L - 0.0894841775 * A - 1.2914855480 * B;
+
+        // linearizing lms back
+        const l = l_ * l_ * l_;
+        const m = m_ * m_ * m_;
+        const s = s_ * s_ * s_;
+
+        // LMS -> linear RGB
+        let r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+        let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+        let b = -0.0045160939 * l - 0.0051802340 * m + 1.0096961860 * s;
+
+        // linear RGB -> sRGB (applying gamma curve)
+        r = r <= 0.0031308 ? r * 12.92 : 1.055 * Math.pow(r, 1 / 2.4) - 0.055;
+        g = g <= 0.0031308 ? g * 12.92 : 1.055 * Math.pow(g, 1 / 2.4) - 0.055;
+        b = b <= 0.0031308 ? b * 12.92 : 1.055 * Math.pow(b, 1 / 2.4) - 0.055;
+
+        // denormalizing to 8bit
+        r = Math.min(Math.max(r, 0), 1) * 255;
+        g = Math.min(Math.max(g, 0), 1) * 255;
+        b = Math.min(Math.max(b, 0), 1) * 255;
+
+        return [r, g, b];
+    },
+    // simplest Euclidian distance between something with 3 components
+    euclidian(c1, c2){
+        const dA = c1[0] - c2[0];
+        const dB = c1[1] - c2[1];
+        const dC = c1[2] - c2[2];
+
+        return Math.sqrt(dA*dA + dB*dB + dC*dC);
+    },
+    oklabDiff(oklab1, oklab2){
+        return cm.euclidian(oklab1, oklab2);
+    },
+    mOklabDiffMix(rgb1, oklab1){
+        const oklab2 = cm.rgb2okLAB(rgb1);
+        return cm.oklabDiff(oklab1, oklab2);
+    },
+    mOklabDiff(rgb1, rgb2){
+        const oklab1 = cm.rgb2okLAB(rgb1);
+        const oklab2 = cm.rgb2okLAB(rgb2);
+        return cm.oklabDiff(oklab1, oklab2);
     }
 };
+const cm = colorManip;
 
 module.exports = colorManip
