@@ -1,25 +1,25 @@
-const $ = require('jquery');
+import querystring from 'querystring'
 
 import {
     hexPalette,
 } from './config';
 import camera from './camera';
 import { generateTable } from './windows';
-import Window from './Window'
+import Window from './Window';
 import globals from './globals';
 import me from './me';
 
 // import userImg from '../img/user2.png';
-import userImg from '../img/user.svg'
+import userImg from '../img/user.svg';
 import { ROLE, ROLE_I } from './constants';
-import IP from './utils/ip';
 import { translate as t } from './translate';
 
-import modBadge from '../img/mod-badge.svg'
-import adminBadge from '../img/admin-badge.svg'
-import creatorBadge from '../img/creator-badge.svg'
+import modBadge from '../img/mod-badge.svg';
+import adminBadge from '../img/admin-badge.svg';
 import { htmlspecialchars } from './utils/misc';
 import { apiRequest } from './utils/api';
+import MiniWindow from './MiniWindow';
+import { chatInput } from './ui/elements';
 
 // WARNING: this will work only if file names are not changed by webpack
 const requireBadge = require.context('../img/badges', false, /\.png$/);
@@ -50,7 +50,7 @@ export default class User {
 
         }
 
-        htmlInfo.set('id', info.id||tempId);
+        htmlInfo.set('id', info.id || tempId);
 
         if (info.ip) {
             if (info.cc && info.cc !== 'XX') {
@@ -72,6 +72,9 @@ export default class User {
                 const role = info.role;
                 let str = '';
                 Object.keys(ROLE).forEach(text => {
+                    // now bans are through the special menu
+                    if (text === 'BANNED') return;
+
                     str += `<option ${(text === role) ? 'selected' : ''}>${text}</option>`;
                 })
                 info.role = role ? ROLE[role] : null;
@@ -96,12 +99,18 @@ export default class User {
         if (me.role >= ROLE.MOD) {
             misc = [
                 [`<input class="alertInput">`, `<button class="sendAlert">${t('btn.sendAlert')}</button>`],
-                [`<input class="modalInput">`, `<button class="sendModal">${t('btn.sendModal')}</button>`],
-                [`<input type="checkbox" id="${info.id}-shadow-cb" class="shadowCheckbox" ${info.shadowBanned ? 'checked' : ''}>`, `<label for="${info.id}-shadow-cb">${t('label.shadowBanned')}</label>`],
+                [`<input class="modalInput">`, `<button class="sendModal">${t('btn.sendModal')}</button>`]
             ];
-            // ip ban is only for guests
-            if (!info.role && me.id !== info.id) {
-                misc.push([`<button class="banByIp">${t('Ban by ip')}</button>`]);
+            if (info.bannedUntil) {
+                misc.push([t('label.bannedUntil'), info.bannedUntil]);
+            }
+            if (me.id !== info.id) {
+                if (info.role) {
+                    misc.push([`<button class="openBanMenu">${t('ban_menu')}</button>`]);
+                } else {
+                    // ip ban is only for guests
+                    misc.push([`<button class="banByIp">${t('Ban by ip')}</button>`]);
+                }
             }
         }
 
@@ -153,22 +162,97 @@ export default class User {
 
         $('.banByIp', win.body).on('click', async () => {
             const ip = info.ip;
-            if (!ip) return toastr.error(t('No ip!'))
+            if (!ip) return toastr.error(t('No ip!'));
 
-            const resp = await apiRequest(`/admin/banPlayer?ip=${ip}`);
-            const success = (await resp.json()).success;
-            if (success)
-                toastr.success(t('Success'));
+            const miniWindow = new MiniWindow(``, 2);
+            const banMenuContents = $(
+                '<div>'+
+                `0=∞ <input type="number" class="bannedUntilNum" value="0" min="0">` +
+                `<select class="bannedUntilMult">
+                    <option value="${1000 * 60}">${t('time.minute')}</option>
+                    <option value="${1000 * 60 * 60}">${t('time.hour')}</option>
+                    <option value="${1000 * 60 * 60 * 24}">${t('time.day')}</option>
+                </select>`+
+                '<div>'
+            );
+
+            const untilNum = $('.bannedUntilNum', banMenuContents);
+            const untilMulti = $('.bannedUntilMult', banMenuContents);
+
+            miniWindow.on('okClicked', () => {
+                const untilNumValue = untilNum.val();
+                const untilMultiValue = new Number(untilMulti.val());
+
+                const untilDate = new Date(Date.now() + untilNumValue * untilMultiValue);
+
+                const ipBanParams = { ip };
+                if (untilNumValue > 0) {
+                    ipBanParams['until'] = untilDate.toISOString();
+                }
+                apiRequest(`/admin/ban/byIp?${querystring.stringify(ipBanParams)}`);
+            });
+
+            miniWindow.bodyElement.append(banMenuContents);
+            $(document.body).append(miniWindow.element);
+
+            setTimeout(() => miniWindow.center());
         });
 
-        $('.shadowCheckbox', win.body).on('click', async e => {
-            const checked = e.target.checked;
-            const id = info.id;
+        $('.openBanMenu', win.body).on('click', async () => {
+            const miniWindow = new MiniWindow(`${t('ban_menu_for')} ${htmlspecialchars(info.name)}`, 2);
+            const banMenuContents = $(
+                `<input type="checkbox" id="${info.id}-shadow-cb" class="shadowCheckbox" ${info.shadowBanned ? 'checked' : ''}>` +
+                `<label for="${info.id}-shadow-cb">${t('label.shadowBanned')}</label><br>` +
 
-            const resp = await apiRequest(`/admin/banPlayer/shadow?uid=${id}&banned=${checked}`, { method: 'POST' });
-            const success = (await resp.json()).success;
-            if (success)
-                toastr.success(t('Success'));
+                `<input type="checkbox" id="${info.id}-banned-cb" class="bannedCheckbox" ${info.role === 'BANNED' ? 'checked' : ''}>` +
+                `<label for="${info.id}-banned-cb">${t('label.banned')}</label><br>` +
+
+                `0=∞ <input type="number" id="${info.id}-until-number" class="bannedUntilNum" value="0" min="0">` +
+                `<select id="${info.id}-until-multiplier" class="bannedUntilMult">
+                    <option value="${1000 * 60}">${t('time.minute')}</option>
+                    <option value="${1000 * 60 * 60}">${t('time.hour')}</option>
+                    <option value="${1000 * 60 * 60 * 24}">${t('time.day')}</option>
+                </select>`
+            );
+            miniWindow.bodyElement.append(banMenuContents);
+            $(document.body).append(miniWindow.element);
+
+
+            const chadowCb = $('.shadowCheckbox', miniWindow.element);
+            const banCb = $('.bannedCheckbox', miniWindow.element);
+            const untilNum = $('.bannedUntilNum', miniWindow.element);
+            const untilMulti = $('.bannedUntilMult', miniWindow.element);
+
+            miniWindow.on('okClicked', () => {
+                const shadowChecked = chadowCb.is(':checked');
+                const banChecked = banCb.is(':checked');
+                const untilNumValue = untilNum.val();
+                const untilMultiValue = new Number(untilMulti.val());
+
+                const untilDate = new Date(Date.now() + untilNumValue * untilMultiValue);
+
+                const vastBanParams = {
+                    uid: info.id,
+                    banned: banChecked
+                };
+                if (untilNumValue > 0) {
+                    vastBanParams['until'] = untilDate.toISOString();
+                }
+                apiRequest(`/admin/ban?${querystring.stringify(vastBanParams)}`);
+
+                const shadowBanParams = {
+                    uid: info.id,
+                    banned: shadowChecked
+                };
+                if (untilNumValue > 0) {
+                    shadowBanParams['until'] = untilDate.toISOString();
+                }
+                apiRequest(`/admin/ban/shadow?${querystring.stringify(shadowBanParams)}`);
+            });
+
+
+            setTimeout(() => miniWindow.center());
+
         });
 
         $('.addBadgeBtn', win.body).on('click', async () => {
@@ -252,8 +336,8 @@ export default class User {
 
         this.nameEl.on('click', function () {
             const visibleNick = this.innerText;
-            globals.elements.chatInput.value += visibleNick + ', ';
-            globals.elements.chatInput.focus();
+            chatInput[0].value += visibleNick + ', ';
+            chatInput.trigger('focus');
         })
 
 

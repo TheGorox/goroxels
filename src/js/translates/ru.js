@@ -34,11 +34,29 @@ export default {
 
     'templates_title': 'Шаблоны',
 
+    'time.minute': 'Минута',
+    'time.hour': 'Час',
+    'time.day': 'День',
+
+    
+    
+    'socketErr.banned': 'Вы были забанены. Если вы считаете, что это ошибка, свяжитесь с администрацией (telegram/discord есть в Help)',
+    'socketErr.bannedUntil': `Вы были временно забанены. До снятия бана: `,
+    
+    // tools.js
+    'paste.choose_from': 'Выбери откуда вставка',
+    'from_clipboard': 'Из буфера обмена',
+    'from_file': 'Из файла',
+    
     // player info window
+    'ban_menu': 'бан меню',
+    'ban_menu_for': 'бан меню для',
     'label.shadowBanned': 'шадоубан',
+    'label.banned': 'полный бан',
+
     'btn.sendAlert': 'Отправить уведом',
     'btn.sendModal': 'Отправить на весь экран',
-    // tools subsection
+    // tools names subsection
     'toolName.clicker': 'кликер',
     'toolName.mover': 'двигалка',
     'toolName.floodfill': 'заливка',
@@ -75,6 +93,7 @@ export default {
     'super secret button': 'кто нажмёт тот гей',
     'show placed pixels': 'показать счётчик пикселей',
     'show patterns over the palette': 'узоры поверх палитры',
+    'tools_to_right_pos': 'инструменты с правой стороны',
     'more emojis!': 'навали эмодзи!',
     'show protected': 'показать защищённые пиксели',
     'brush size': 'размер кисти',

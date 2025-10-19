@@ -1,8 +1,10 @@
 import globals from './globals';
 
-const NOT_FINISHED = 0,
-    FINISHED = 1,
-    DELETED = 2;
+export const FX_STATE = {
+    IN_PROCESS: 0, // to force renderer to render
+    FINISHED: 1, // render when it's needed (next canvas update)
+    REMOVED: 2 // don't render and delete
+}
 
 export class FX {
     constructor(renderFunc) {
@@ -58,15 +60,10 @@ export class FXRenderer {
 
                     let r = fx.render(this.ctx);
 
-                    /*
-                        0 - not finished yet
-                        1 - finished but continue rendering
-                        2 - finished
-                    */
 
-                    if (r == 2) {
+                    if (r == FX_STATE.REMOVED) {
                         this.remove(fx);
-                    } else if (r == 0) {
+                    } else if (r == FX_STATE.IN_PROCESS) {
                         this.needRender = true;
                     }
                 } catch (error) {

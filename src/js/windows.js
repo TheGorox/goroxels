@@ -31,7 +31,7 @@ import mb4Icon from '../img/mouse/mouse-4mb.png';
 import mb5Icon from '../img/mouse/mouse-5mb.png';
 import { apiRequest, fetchCaptcha, solveCaptcha } from './utils/api';
 import { shareTemplate, showTemplates, updateTemplate } from './template';
-import { setPaletteColorsSize, showPatternsOnPalette, unloadPalettePatterns } from './ui/config';
+import { setPaletteColorsSize, showPatternsOnPalette, swapToolsPos, unloadPalettePatterns } from './ui/config';
 
 
 const mouseKeys = {
@@ -395,7 +395,8 @@ export function uiSettings() {
         [t('emoji list'), '<input type="text" id="emojiList">'],
         [`<button id="moreEmojis">${t('super secret button')}</button>`],
         [t('show placed pixels'), '<input type="checkbox" id="togglePlaced">'],
-        [t('show patterns over the palette'), '<input type="checkbox" id="showPatterns">']
+        [t('show patterns over the palette'), '<input type="checkbox" id="showPatterns">'],
+        [t('tools_to_right_pos'), '<input type="checkbox" id="swapToolsPos">']
     ]);
     $(setWin.body).append(table);
 
@@ -445,6 +446,14 @@ export function uiSettings() {
         globals.showPatterns = show;
         setLS('showPalettePatterns', show ? '1' : '0');
         show ? showPatternsOnPalette() : unloadPalettePatterns();
+    });
+
+    $('#swapToolsPos')[0].checked = +getOrDefault('swapToolsPos', 0) == 1;
+    $('#swapToolsPos').on('click', e => {
+        const swap = e.target.checked;
+        globals.showPatterns = swap;
+        setLS('swapToolsPos', swap ? '1' : '0');
+        swapToolsPos(swap);
     });
 }
 

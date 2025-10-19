@@ -179,10 +179,18 @@ input[type=number] {
     .showMenu {
         right: 5px;
     }
+    .showMenu.right {
+        left: 5px;
+        right: unset;
+    }
 
     .showChat {
         right: 50px;
         background-image: url(../img/chat.svg);
+    }
+    .showChat.right {
+        left: 50px;
+        right: unset;
     }
 
     .showChat-notify {
@@ -414,7 +422,7 @@ body {
 }
 
 /* patterns */
-.paletteColor>img {
+.paletteColor>img, .paletteColor>svg {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -434,8 +442,12 @@ body {
     z-index: 2;
     /* width: 40px; */
 }
+#tools.right{
+    right: 5px;
+    left: unset;
+}
 
-.toolContainer {
+.toolContainer, .showAllToolsButton {
     display: flex;
     vertical-align: middle;
     justify-content: center;
@@ -443,7 +455,17 @@ body {
     background-color: white;
     border-radius: 5px;
     image-rendering: pixelated;
-    /* height: 36px; */
+    max-width: 36px;
+}
+
+.showAllToolsButton {
+    margin-top: 1px;
+}
+
+.showAllToolsButton > img {
+    width: fit-content;
+    filter: brightness(0);
+    height: 10px;
 }
 
 .toolContainer.selected {
@@ -865,6 +887,7 @@ input[type=range]::-moz-range-thumb {
     top: 50%;
     right: -20px;
     transition: right ease-in-out .2s;
+    display: none;
 }
 
 #modMenu>div {
@@ -1224,6 +1247,10 @@ table .authLogo {
     height: 17px;
 }
 
+.miniWindowBody {
+    padding: 3px;
+}
+
 .miniWindowButtons {
     display: flex;
     justify-content: space-evenly;
@@ -1478,3 +1505,7 @@ textarea {
     color: gold;
 }
 
+/* it's in mini window so we can't take so much space */
+.bannedUntilNum {
+    width: 60px;
+}

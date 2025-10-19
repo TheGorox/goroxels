@@ -7,7 +7,14 @@ export const urlInput = $('#templateURL'),
     chat = $('#chat'),
     chatInput = $('#chatInput'),
     template = $('#template'),
-    topMenu = $('#topMenu');
+    topMenu = $('#topMenu'),
+
+    mainCanvas = $('#board'),
+    fxCanvas = $('#fx'),
+    palette = $('#palette'),
+    online = $('#onlineCounter'),
+    coords = $('#coords'),
+    topMenuContent = $('#topMenu>.content');
 
 // you can't just change css se..
 export function changeSelector(selector, obj) {

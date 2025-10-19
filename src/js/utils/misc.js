@@ -4,6 +4,7 @@ import {
     canvasName,
 } from '../config';
 import globals from '../globals';
+import { topMenuContent } from '../ui/elements';
 
 export let halfMap = [null, null]
 export function initHalfmap() {
@@ -80,12 +81,12 @@ export function stringifyKeyEvent(ev) {
 }
 
 export function calculateColumnSize() {
-    const columns = $('.column', globals.elements.topMenuContent);
+    const columns = $('.column', topMenuContent);
     const windowWidth = window.innerWidth;
 
     const colWidth = windowWidth / columns.length;
 
-    $('.column', globals.elements.topMenuContent).css('width', colWidth);
+    $('.column', topMenuContent).css('width', colWidth);
 }
 
 export function htmlspecialchars(text) {
@@ -223,4 +224,14 @@ export function makeScreenshot() {
     link.download = `GX ${canvasName} ${getPathsafeDate()}.png`;
     link.href = canvas.toDataURL()
     link.click();
+}
+
+export async function sleep(ms) {
+    return new Promise(res => setTimeout(res, ms));
+}
+
+// calculates mouse down/up coords and tells is it drag or click
+export function isClick(downPos, upPos, threshold=5){
+    return Math.abs(downPos[0] - upPos[0]) < threshold &&
+        Math.abs(downPos[1] - upPos[1]) < threshold;
 }

@@ -14,21 +14,22 @@ const player = {
     brushSize: 1,
     secondCol: -1,
     id: -1,
-    init(){
+    suspendedClrs: null,
+    init() {
         this.loadColors();
         this.switchColor(this.color, true);
         this.switchSecondColor(this.secondCol, true);
     },
-    loadColors(){
+    loadColors() {
         this.color = +getOrDefault('color1', -1, true);
         this.secondCol = +getOrDefault('color2', -1, true);
     },
-    switchColor(id, initial=false){
-        if(this.secondCol === id && id !== -1){
+    switchColor(id, initial = false) {
+        if (this.secondCol === id && id !== -1) {
             this.switchSecondColor(-1);
         }
-        
-        if(this.color === id && !initial)
+
+        if (this.color === id && !initial)
             id = this.color = -1;
         else
             this.color = id;
@@ -36,17 +37,17 @@ const player = {
         globals.renderer.preRender();
 
         $('.paletteColor.selected').removeClass('selected');
-        if(id !== -1){
+        if (id !== -1) {
             $('#col' + id).addClass('selected');
         }
 
         setLS('color1', id, true);
     },
-    switchSecondColor(id, initial){
-        if(this.color === id && id !== -1){
+    switchSecondColor(id, initial) {
+        if (this.color === id && id !== -1) {
             this.switchColor(-1);
         }
-        if(this.secondCol === id && !initial)
+        if (this.secondCol === id && !initial)
             id = this.secondCol = -1;
         else
             this.secondCol = id;
@@ -54,21 +55,37 @@ const player = {
         globals.renderer.preRender();
 
         $('.paletteColor.selectedSecond').removeClass('selectedSecond');
-        if(id !== -1){
+        if (id !== -1) {
             $('#col' + id).addClass('selectedSecond');
         }
 
         setLS('color2', id, true);
     },
-    swapColors(){
+    swapColors() {
         const temp = this.color;
         this.switchColor(this.secondCol);
         this.switchSecondColor(temp);
     },
-    resetColors(){
+    resetColors() {
         this.switchColor(-1);
         this.switchSecondColor(-1);
     },
+
+    // suspend/restore is a workaround to
+    // temporarily disable drawing by mouse/tools
+    suspendColors() {
+        this.suspendedClrs = [this.color, this.secondCol];
+        this.resetColors();
+    },
+    restoreColors() {
+        if (!this.suspendedClrs) return;
+
+        this.switchColor(this.suspendedClrs[0]);
+        this.switchSecondColor(this.suspendedClrs[1]);
+
+        this.suspendedClrs = null;
+    },
+
     bucket: null,
     updateBucket([delay, max]) {
         this.bucket = new Bucket(delay, max);
@@ -108,20 +125,44 @@ function getMyCooldown() {
     return cooldowns[ROLE_I[me.role]] || cooldown.GUEST;
 }
 
-export function placePixels(pixels, store = true) {
-    // does not checks pixels
+export function placePixels(pixels, store = true, isCtrlZ = false) {
+    // does not check pixels, excluding for wand
+
+    // check to allow place only on selected color, if selected
+    if (!isCtrlZ && globals.wandSelectedColor !== null) {
+        const allowedCol = globals.wandSelectedColor;
+
+        let someValid = false;
+        for (let i = 0; i < pixels.length; i++) {
+            const boardCol = globals.chunkManager.getChunkPixel(...pixels[i]);
+            if (boardCol !== allowedCol) {
+                // making pixels invalid
+                pixels[i][2] = 127;
+            } else {
+                someValid = true;
+            }
+        }
+
+        if (!someValid) return;
+
+        globals.fxRenderer.needRender = true;
+    }
 
     if (store) {
-        pixels.forEach(([x, y]) => {
+        pixels.forEach(([x, y, c]) => {
+            if(c === 127) return;
             player.placed.push([x, y, globals.chunkManager.getChunkPixel(x, y)]);
         })
     }
     globals.socket.sendPixels(pixels, false);
 }
 
-export function placePixel(x, y, col, store = true) {
+export function placePixel(x, y, col, store = true, isCtrlZ = false) {
     const oldCol = globals.chunkManager.getChunkPixel(x, y),
         isProtected = globals.chunkManager.getProtect(x, y);
+
+    const wandColor = globals.wandSelectedColor;
+    if (!isCtrlZ && wandColor !== null && oldCol !== wandColor) return;
 
     if (oldCol !== col && (!isProtected || me.role >= ROLE.TRUSTED) && globals.socket.connected) {
         if (store) {
@@ -133,6 +174,8 @@ export function placePixel(x, y, col, store = true) {
         }
 
         globals.chunkManager.setChunkPixel(x, y, col);
+        globals.fxRenderer.needRender = true;
+
         globals.socket.sendPixel(x, y, col);
 
         globals.socket.pendingPixels[x + ',' + y] = setTimeout(() => {

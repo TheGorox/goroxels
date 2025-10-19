@@ -6,6 +6,7 @@ import { togglePlaced, updatePlaced } from "../player";
 import { isDarkColor } from "../utils/color";
 import { getLS, getOrDefault } from "../utils/localStorage";
 import { getRecommendedColorSize } from "../utils/misc";
+import { chatInput, coords } from "./elements";
 
 export function initUISettings() {
     fixColorsWidth();
@@ -17,12 +18,15 @@ export function initUISettings() {
         showPatternsOnPalette();
         globals.showPatterns = true;
     }
+    if (getLS('swapToolsPos') == 1) {
+        swapToolsPos(getLS('swapToolsPos'));
+    }
 }
 
 export function initCoordsClick() {
-    globals.elements.coords.addEventListener('click', function () {
-        globals.elements.chatInput.value += this.innerText;
-        globals.elements.chatInput.focus();
+    coords.on('click', function () {
+        chatInput[0].value += this.innerText;
+        chatInput.trigger('focus');
     })
 }
 
@@ -119,6 +123,14 @@ export function showPatternsOnPalette() {
         $(`#col${i}`).append(img);
     });
     $('.paletteColor').addClass('patternColor');
+}
+export function swapToolsPos(state){
+    const qs = $('#tools,.showMenu,.showChat')
+    if(state == 1){
+        qs.addClass('right');
+    }else{
+        qs.removeClass('right');
+    }
 }
 
 export function unloadPalettePatterns() {

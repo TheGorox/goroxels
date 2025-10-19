@@ -1,3 +1,5 @@
+import { palette } from "../config";
+
 export function rgb2abgr(r, g, b) {
     return 0xff000000 | b << 16 | g << 8 | r;
 }
@@ -41,6 +43,12 @@ export function closestColor(rgb, palette){
         if(scrnow == 0) break;
     }
     return colorId;
+}
+
+export function getPaletteColorId(color){
+    return palette.findIndex(palCol => {
+        return palCol[0] === color[0] && palCol[1] === color[1] && palCol[2] === color[2];
+    });
 }
 
 export function isDarkColor(r, g, b){

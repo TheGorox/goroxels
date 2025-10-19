@@ -13,8 +13,11 @@ import {
 } from './utils/misc';
 import { getLS, setLS } from './utils/localStorage';
 import me from './me';
+import { coords as coordsEl } from './ui/elements';
 
-const coords = globals.elements.coords;
+import downArrow from '../img/arrow.svg';
+
+const coords = coordsEl[0];
 
 function updatePlayerCoords(clientX, clientY) {
     let [newX, newY] = screenToBoardSpace(clientX, clientY);
@@ -71,6 +74,7 @@ export default class ToolManager extends EventEmitter {
 
     addTools() {
         const toolsEl = document.getElementById('tools');
+        let hiddenToolsEl = null;
 
         Object.keys(this.tools).forEach(name => {
             const tool = this.tools[name];
@@ -86,7 +90,33 @@ export default class ToolManager extends EventEmitter {
                 img.src = tool.icon;
 
                 el.appendChild(img);
-                toolsEl.appendChild(el); // todo add click choosing etc
+
+                if(toolsEl.childElementCount >= 5){
+                    if(!hiddenToolsEl){
+                        hiddenToolsEl = document.createElement('div');
+                        hiddenToolsEl.style.display = 'none';
+
+                        const showAllButton = document.createElement('div');
+                        showAllButton.className = 'showAllToolsButton';
+                        const showAllImg = document.createElement('img');
+                        showAllImg.src = downArrow;
+
+                        showAllButton.append(showAllImg);
+
+                        showAllButton.addEventListener('click', e => {
+                            const state = parseInt(showAllButton.dataset.state ?? 0);
+                            hiddenToolsEl.style.display = state ? 'none' : '';
+                            showAllImg.style.transform = state ? '' : 'rotate(180deg)';
+                            showAllButton.dataset.state = state ? '0' : '1';
+                        });
+
+                        toolsEl.append(hiddenToolsEl, showAllButton);
+                    }
+
+                    hiddenToolsEl.append(el);
+                }else{
+                    toolsEl.appendChild(el);
+                }
 
                 el.addEventListener('pointerdown', this.selectTool.bind(this, tool));
 
@@ -118,7 +148,9 @@ export default class ToolManager extends EventEmitter {
         const curToolEl = document.getElementById(`tool_${toolKey}`);
         curToolEl.classList = ['toolContainer selected'];
 
+        this.tool.emit('deselected');
         this.tool = tool;
+        this.tool.emit('selected');
     }
 
     blockToolChange() {
@@ -223,6 +255,7 @@ export default class ToolManager extends EventEmitter {
                     if (strEvKey === tool2.key || 
                         // make up event on single Alt, because after that keyup on the 
                         // primary key will no longer match the tool key string (i.e. up="V" vs key="ALT+V")
+                        
                         (strEvKey.startsWith('Alt') && tool2keyDecoded.alt) || 
                         (strEvKey.startsWith('Ctrl') && tool2keyDecoded.ctrl)) {
                             tool2.emit('up', e)

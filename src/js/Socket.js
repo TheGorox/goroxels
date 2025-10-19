@@ -7,7 +7,8 @@ import {
 } from './protocol';
 import {
     canvasId,
-    canvasName
+    canvasName,
+    palette
 } from './config'
 import globals from './globals'
 import User from './user';
@@ -15,7 +16,7 @@ import chat from './Chat';
 import { captchaModal } from './windows';
 import Window, { Modal } from './Window';
 import player, { updatePlaced } from './player';
-import { translate } from './translate';
+import { translate as t } from './translate';
 import { htmlspecialchars } from './utils/misc';
 
 export default class Socket extends EventEmitter {
@@ -29,6 +30,8 @@ export default class Socket extends EventEmitter {
         this.pendingPixels = {};
 
         this.connectedOnce = false;
+
+        this.reconnectFactor = 1;
 
         this.connect();
     }
@@ -61,10 +64,12 @@ export default class Socket extends EventEmitter {
 
             globals.chunkManager.clearLoadingChunks();
 
+            const reconnectDelay = Math.min(this.reconnectFactor * 1000 - Math.random() * 1000, 60_000);
             setTimeout(() => {
                 console.log('reconnect');
                 this.reconnect();
-            }, Math.random() * 1000);
+                this.reconnectFactor *= 1.5;
+            }, reconnectDelay);
         }
     }
 
@@ -144,8 +149,15 @@ export default class Socket extends EventEmitter {
                         if (!Window.Exists('Captcha'))
                             captchaModal();
                     }
-                    toastr.error(error, translate('Error from the Socket:'), {
-                        preventDuplicates: true
+                    let msg;
+                    if (typeof error === 'object') {
+                        msg = t('socketErr.' + error.msg) + error.data ?? '';
+                    } else {
+                        msg = t('socketErr.' + error);
+                    }
+                    toastr.error(msg, t('Error from the Socket:'), {
+                        preventDuplicates: true,
+                        timeOut: 30000,
                     });
                 });
 
@@ -247,6 +259,9 @@ export default class Socket extends EventEmitter {
                     x = dv.getUint16(i);
                     y = dv.getUint16(i + 2);
                     col = dv.getUint8(i + 4);
+
+                    if (col > palette.length) continue;
+
                     if (isProtect) {
                         this.emit('protect', x, y, col);
                     } else {
@@ -261,6 +276,8 @@ export default class Socket extends EventEmitter {
             }
 
             case OPCODES.ping: {
+                this.reconnectFactor = 1;
+
                 this.socket.send(new Uint8Array([OPCODES.ping]));
                 break
             }
@@ -278,6 +295,8 @@ export default class Socket extends EventEmitter {
                     const y = dv.getUint16(off + 2);
                     const c = dv.getUint8(off + 4);
                     const placerId = dv.getUint32(off + 5);
+
+                    if (c > palette.length) continue;
 
                     this.onIncomingPixel([x, y, c], placerId);
                 }

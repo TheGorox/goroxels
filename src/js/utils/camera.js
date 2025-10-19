@@ -1,6 +1,6 @@
 import camera from '../camera';
 import { halfMap } from './misc';
-import { screenToBoardSpace } from './conversions';
+import { boardToScreenSpace, screenToBoardSpace } from './conversions';
 import {
     chunkSize,
     boardChunkWid,
@@ -9,15 +9,15 @@ import {
     boardHeight
 } from '../config';
 
-export function isAreaVisible(x, y, w, h){
-    let sx = camera.x + halfMap[0],
-        sy = camera.y + halfMap[1];
-    
-    let ex = sx + window.innerWidth / camera.zoom,
-        ey = sy + window.innerHeight / camera.zoom;
+export function isAreaVisible(x, y, w, h) {
+    const [x1, y1] = boardToScreenSpace(x, y);
+    const [x2, y2] = boardToScreenSpace(x + w, y + h);
 
-    return x + w >= sx && x < ex &&
-           y + h >= sy && y < ey
+    return x1 < window.innerWidth && x2 >= 0 && y1 < window.innerHeight && y2 >= 0;
+}
+
+export function isChunkVisible(cx, cy) {
+    return isAreaVisible(cx * chunkSize, cy * chunkSize, chunkSize, chunkSize);
 }
 
 export function getVisibleChunks() {
@@ -44,7 +44,7 @@ export function getVisibleChunks() {
     return arr
 }
 
-export function inBounds(x, y){
-    if(x < 0 || x >= boardWidth || y < 0 || y >= boardHeight) return false;
+export function inBounds(x, y) {
+    if (x < 0 || x >= boardWidth || y < 0 || y >= boardHeight) return false;
     return true;
 }

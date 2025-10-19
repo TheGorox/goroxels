@@ -1,9 +1,4 @@
-import EventEmitter from 'events'
-import EventManager from './EventManager'
-
-import {
-    insanelyLongMobileBrowserCheck
-} from './utils/misc'
+import EventManager from './EventManager';
 
 export default {
     socket: null,
@@ -12,23 +7,41 @@ export default {
     fxRenderer: null,
     player: null,
     toolManager: null,
-    events: new EventEmitter,
-    eventManager: new EventManager(document.getElementById('board')),
-    mainCtx: document.getElementById('board').getContext('2d'),
-    fxCtx: document.getElementById('fx').getContext('2d'),
-    mobile: insanelyLongMobileBrowserCheck(),
-    users: {},
-    elements: { // TODO move it to elements.js
-        mainCanvas: $('#board')[0],
-        fxCanvas: $('#fx')[0],
-        palette: $('#palette')[0],
-        online: $('#onlineCounter')[0],
-        coords: $('#coords')[0],
-        topMenu: $('#topMenu')[0],
-        topMenuContent: $('#topMenu>.content')[0],
-        chatInput: $('#chatInput')[0]
+
+    get eventManager() {
+        if (!this._eventManager) {
+            this._eventManager = new EventManager(document.getElementById('board'))
+        }
+        return this._eventManager
     },
+    
+    get mainCtx() {
+        if (!this._mainCtx) {
+            this._mainCtx = document.getElementById('board').getContext('2d')
+        }
+        return this._mainCtx
+    },
+    
+    get fxCtx() {
+        if (!this._fxCtx) {
+            this._fxCtx = document.getElementById('fx').getContext('2d')
+        }
+        return this._fxCtx
+    },
+    
+    get mobile() {
+        if (this._mobile === undefined) {
+            // Ленивая загрузка тяжелой проверки
+            const { insanelyLongMobileBrowserCheck } = require('./utils/misc')
+            this._mobile = insanelyLongMobileBrowserCheck()
+        }
+        return this._mobile
+    },
+    
+    users: {},
 
     // to prevent tool usage due to rebinding
-    lockInputs: false
+    lockInputs: false,
+
+    wandSelectedColor: null
 }

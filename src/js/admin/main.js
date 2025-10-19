@@ -11,7 +11,6 @@ import { ROLE } from '../../../../goroxels-server/src/constants'
 let canvases;
 
 async function apiRequest(path, args, isPost = false, isBinary = false) {
-    // this is shit
     const query = querystring.stringify(args)
 
     const resp = await fetch('/api/' + path + '?' + query, {
@@ -446,6 +445,11 @@ async function initBackup() {
         }
 
         const cropEnabled = crop && $("#cropRollbackCB").is(':checked');
+
+        if(!cropEnabled){
+            alert('Ебанулся?');
+            return;
+        }
 
         // let p = prompt('Are you sure?');
         // if(p == null) return;

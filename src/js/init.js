@@ -13,6 +13,7 @@ export function initInputs() {
     initHandlers();
     initButtons();
     initChat();
+    initDraggableInputs();
 }
 
 export function initOtherCoolFeatures() {

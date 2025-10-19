@@ -1,60 +1,44 @@
-import Tool from './Tool'
-import globals from './globals'
-
-import shapes from './utils/shapes';
-import {
-    inBounds
-} from './utils/camera';
-import {
-    boardToScreenSpace,
-    screenToBoardSpace
-} from './utils/conversions';
-
-import player, { placePixel, placePixels, updateBrush } from './player';
-import {
-    addFX,
-    FX,
-    removeFX
-} from './fxcanvas';
-import {
-    boardHeight,
-    boardWidth,
-    canvasId,
-    chunkSize,
-    hexPalette,
-    palette,
-    showProtected
-} from './config';
+import { toggleChat } from './Chat';
+import MiniWindow, { SelectMiniWindow } from './MiniWindow';
+import Tool from './Tool';
 import camera from './camera';
-import {
-    changeSelector,
-    chatInput
-} from './ui/elements';
-
-
+import { boardHeight, boardWidth, canvasId, chunkSize, hexPalette, palette, resolveWhenConfigDownloaded, showProtected } from './config';
 import { ROLE } from './constants';
-
-import clickerIcon from '../img/toolIcons/clicker.png'
-import moveIcon from '../img/toolIcons/move.png'
-import floodfillIcon from '../img/toolIcons/floodfill.png'
-// import pipetteIcon from '../img/toolIcons/pipette.png'
-import lineIcon from '../img/toolIcons/line.png'
-import protectIcon from '../img/toolIcons/protect.png'
-import revertIcon from '../img/toolIcons/revert.png'
-
-import template, { updateTemplate } from './template';
+import { addFX, FX, FX_STATE, removeFX } from './fxcanvas';
+import globals from './globals';
 import me from './me';
-import { closestColor } from './utils/color';
+import player, { placePixel, placePixels, updateBrush } from './player';
+import template, { updateTemplate } from './template';
+import { translate as t } from './translate';
+import { changeSelector, chatInput, mainCanvas } from './ui/elements';
+import { toggleEverything, toggleTopMenu } from './ui/toggles';
+import { apiRequest } from './utils/api';
+import { inBounds } from './utils/camera';
+import { closestColor, getPaletteColorId, isDarkColor } from './utils/color';
+import { boardToScreenSpace, screenToBoardSpace } from './utils/conversions';
 import { getLS, getOrDefault, setLS } from './utils/localStorage';
-import { htmlspecialchars, testPointInPolygon } from './utils/misc';
 import { mapRange } from './utils/math';
+import { htmlspecialchars, isClick, sleep, testPointInPolygon } from './utils/misc';
+import shapes from './utils/shapes';
+import { generateShader } from './utils/webGL';
+
+import clickerIcon from '../img/toolIcons/clicker.png';
+import disableIcon from '../img/toolIcons/disable.png';
+import floodfillIcon from '../img/toolIcons/floodfill.png';
+import lineIcon from '../img/toolIcons/line.png';
+import moveIcon from '../img/toolIcons/move.png';
+// import pipetteIcon from '../img/toolIcons/pipette.png'
+import protectIcon from '../img/toolIcons/protect.png';
+import revertIcon from '../img/toolIcons/revert.png';
+import wandIcon from '../img/toolIcons/wand-cur.png';
+
+import disableCur from '../img/toolIcons/disable-cur.png';
+import wandCursor from '../img/toolIcons/wand-cur.png';
 
 import min5fontSheet from '../font/pixel/min5.png';
 import min5fontInfo from '../font/pixel/min5.txt';
-import MiniWindow from './MiniWindow';
-import { apiRequest } from './utils/api';
-import { toggleChat } from './Chat';
-import { toggleEverything, toggleTopMenu } from './ui/toggles';
+
+import disabledColorSvg from '../img/disabled-color.svg';
 
 const mobile = globals.mobile;
 
@@ -1164,7 +1148,7 @@ class CtrlZ extends Tool {
 
                 const [x, y, c] = player.placed.pop();
 
-                placePixel(x, y, c, false);
+                placePixel(x, y, c, false, true);
             }
             while (--multiTicks)
         }.bind(this);
@@ -1301,6 +1285,11 @@ class Paste extends Tool {
         this.moveFX = null;
         this.drawInterval = null;
 
+        this.lastClipboardEvent = {
+            ev: null,
+            date: null
+        }
+
         this.initListeners();
     }
 
@@ -1309,13 +1298,30 @@ class Paste extends Tool {
     }
 
     async down() {
-        if (this.state == 0 || this.state == 1) {
+        if (this.state === 0 || this.state === 1) {
             this.state = 1;
 
+            // in case 'Paste' event launched later
+            await sleep(100);
+
             try {
-                const canvas = await this.getImage();
-                this.startPlace(canvas);
-            } catch {
+                let whichOne = 'file';
+                if (this.isImagePasted()) {
+                    whichOne = await this.promptClipboardOrFile();
+                }
+
+                let canvas;
+                if (whichOne === 'clip') {
+                    canvas = await this.getClipboardImage(this.lastClipboardEvent.ev);
+                } else if (whichOne === 'file') {
+                    canvas = await this.askFileImage();
+                }
+                if (canvas)
+                    this.startPlace(canvas);
+
+                this.lastClipboardEvent.ev = null;
+                this.lastClipboardEvent.date = null;
+            } finally {
                 this.state = 0;
             }
         } else if (this.state == 2) {
@@ -1327,7 +1333,41 @@ class Paste extends Tool {
         }
     }
 
-    async getImage() {
+    async promptClipboardOrFile() {
+        return new Promise((res, rej) => {
+            try {
+                const btns = [{
+                    text: t('from_clipboard'),
+                    id: 'clip'
+                },
+                {
+                    text: t('from_file'),
+                    id: 'file'
+                }];
+
+                const win = new SelectMiniWindow(btns, res, t('paste.choose_from'));
+                document.body.appendChild(win.element[0]);
+
+                win.center();
+            } catch (error) {
+                rej(error);
+            }
+        });
+    }
+
+    isImagePasted() {
+        const lastEv = this.lastClipboardEvent;
+        if (!lastEv.images || Date.now() - lastEv.date > 1000) return false;
+        return true;
+    }
+
+    async getClipboardImage() {
+        const { images } = this.lastClipboardEvent;
+        if (!images?.length) return null;
+        return await this.readCanvasFromFile(images[0]);
+    }
+
+    async askFileImage() {
         // get file from system
         const input = document.createElement('input');
         input.type = 'file';
@@ -1344,33 +1384,44 @@ class Paste extends Tool {
                 }
 
                 // read first file with filereader
-                const reader = new FileReader();
-                reader.readAsDataURL(input.files[0]);
-
-                reader.onload = () => {
-                    // load image with "img" tag
-                    const img = new Image();
-                    img.src = reader.result;
-                    img.onload = () => {
-                        // draw image on canvas to get its data
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-
-                        res(canvas);
-                    }
-                    img.onerror = rej;
-                }
-                reader.onerror = rej;
+                this.readCanvasFromFile(input.files[0])
+                    .then(res)
+                    .catch(rej);
             }
         })
     }
 
-    startPlace(canvas) {
-        player.resetColors();
+    readCanvasFromFile(file) {
+        return new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+
+            reader.onload = () => {
+                const img = new Image();
+                img.src = reader.result;
+                img.onload = () => {
+                    // draw image on canvas to get its data
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+
+                    res(canvas);
+                }
+                img.onerror = rej;
+            }
+            reader.onerror = rej;
+        })
+    }
+
+    startPlace(canvas, protectMask = null) {
+        if (protectMask && protectMask.length !== canvas.width * canvas.height) {
+            throw new Error('protect mask length mismatch');
+        }
+
+        player.suspendColors();
         this.state = 2;
 
         let xPos = player.x,
@@ -1422,9 +1473,10 @@ class Paste extends Tool {
             if (Math.abs(x - lastX) > 5 || Math.abs(y - lastY) > 5) return;
 
             off();
+            player.restoreColors();
 
             this.stopPlace();
-            this.startDraw(canvas, xPos, yPos);
+            this.startDraw(canvas, xPos, yPos, protectMask);
         }
         up = up.bind(this);
 
@@ -1444,7 +1496,7 @@ class Paste extends Tool {
         this.removeAllListeners('move');
     }
 
-    startDraw(canvas, offx, offy) {
+    startDraw(canvas, startX, startY, protectMask = null) {
         this.state = 3;
 
         const ctx = canvas.getContext('2d');
@@ -1453,17 +1505,19 @@ class Paste extends Tool {
         let imgdata = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         let offset = -4;
 
+        const isMod = me.role >= ROLE.MOD;
+
         function draw() {
             let allowance = Math.floor(player.bucket.allowance);
             if (allowance == 0) return;
 
-            let pixels = [];
+            let pixels = [], protectPixels = [];
 
             let max = 13106;
             if (getLS('ya', false) === 'polkovnik') {
                 max = 52441;
             }
-            while (allowance > 0 && offset < imgdata.length - 4 && pixels.length < 13106) {
+            while (allowance > 0 && offset < imgdata.length - 4 && pixels.length < max && protectPixels.length < max) {
                 offset += 4;
 
                 let rgba = [
@@ -1476,14 +1530,20 @@ class Paste extends Tool {
                 if (rgba[3] < 127) continue;
 
                 let off = offset / 4;
-                const x = off % w,
-                    y = off / w | 0;
+                const offX = off % w,
+                    offY = off / w | 0;
 
-                const boardX = offx + x,
-                    boardY = offy + y;
+                const boardX = startX + offX,
+                    boardY = startY + offY;
                 if (boardX < 0 || boardX >= boardWidth ||
                     boardY < 0 || boardY >= boardHeight)
                     continue
+
+                if (isMod && protectMask) {
+                    const protectedState = protectMask[offX + offY * w];
+                    protectPixels.push([boardX, boardY, protectedState]);
+                }
+
 
                 const color = closestColor(rgba, palette);
                 const oldCol = globals.chunkManager.getChunkPixel(boardX, boardY);
@@ -1497,6 +1557,9 @@ class Paste extends Tool {
             if (pixels.length) {
                 player.bucket.spend(pixels.length);
                 globals.socket.sendPixels(pixels);
+                if (protectPixels.length) {
+                    globals.socket.sendPixels(protectPixels, true);
+                }
             }
 
             if (offset >= imgdata.length - 4) {
@@ -1513,6 +1576,26 @@ class Paste extends Tool {
     }
 }
 const paste = new Paste('paste', 'CTRL+KeyV', null, ROLE.MOD);
+document.addEventListener('paste', (ev) => {
+    // paste event does not work for other than ctrl+v
+    // so skip in case some another tool assigned for this key
+    // (check your sanity if you do :D)
+    if (paste.key !== 'CTRL+KeyV') return;
+
+    const images = [];
+    for (const item of ev.clipboardData.items) {
+        if (item.type.startsWith('image/')) {
+            images.push(item.getAsFile());
+        }
+    }
+
+    if (images.length) {
+        paste.lastClipboardEvent = {
+            images,
+            date: Date.now()
+        };
+    }
+})
 
 // TODO move it to config or globals
 let tempOpacity = parseFloat(getOrDefault('template.opacity', 0.5, true));
@@ -1703,8 +1786,8 @@ class Copy extends Tool {
         e.stopPropagation();
 
         camera.disableMove();
-        player.resetColors();
-        globals.elements.mainCanvas.style.cursor = 'crosshair';
+        player.suspendColors();
+        mainCanvas.css('cursor', 'crosshair');
 
         this.state = 1;
 
@@ -1746,7 +1829,7 @@ class Copy extends Tool {
         }
         function mouseup() {
             // area is selected and we can tell Paste tool to draw it
-            globals.elements.mainCanvas.style.cursor = '';
+            mainCanvas.css('cursor', '');
 
             removeFX(fx);
 
@@ -1759,6 +1842,7 @@ class Copy extends Tool {
             this.state = 0;
 
             camera.enableMove();
+            player.restoreColors();
 
             onSelected();
         }
@@ -1847,6 +1931,7 @@ class Copy extends Tool {
 
             const ctx = canvas.getContext('2d');
             const data = ctx.createImageData(w, h);
+            const protectMask = new Uint8Array(w * h);
 
             // poly x coordinates and y coordinates arrays
             let vertx, verty;
@@ -1867,14 +1952,18 @@ class Copy extends Tool {
                     const i = (x + y * w) * 4;
 
                     // absolute board coordinates
-                    const cx = minX + x;
-                    const cy = minY + y;
+                    const absX = minX + x;
+                    const absY = minY + y;
 
-                    if (lassoMode && !testPointInPolygon(lassoPoints.length, vertx, verty, cx, cy)) {
+                    if (lassoMode && !testPointInPolygon(lassoPoints.length, vertx, verty, absX, absY)) {
                         continue
                     }
 
-                    const colId = globals.chunkManager.getChunkPixel(cx, cy);
+
+                    const isProtected = globals.chunkManager.getProtect(absX, absY);
+                    protectMask[i / 4] = isProtected;
+
+                    const colId = globals.chunkManager.getChunkPixel(absX, absY);
                     const col = palette[colId];
 
                     data.data[i] = col[0];
@@ -1887,7 +1976,7 @@ class Copy extends Tool {
             ctx.putImageData(data, 0, 0);
 
             // let the Paste tool do other stuff
-            paste.startPlace(canvas);
+            paste.startPlace(canvas, protectMask);
         }
     }
 }
@@ -2274,6 +2363,651 @@ resetColors.on('up', () => {
     player.resetColors();
 });
 
+const WAND_STATE = {
+    DISABLED: 0,
+    SELECTING: 1,
+    RENDERING: 2
+}
+class MagicWand extends Tool {
+    constructor(...args) {
+        super(...args);
+
+        this.state = WAND_STATE.DISABLED;
+
+        this.mouseListeners = {
+            down: this.mousedown.bind(this),
+            up: this.mouseup.bind(this)
+        };
+
+        this.downPos = null;
+
+        this.fx = null;
+
+        this.selectedColor = null;
+
+        this.maskCanvas = null;
+        this.maskImData = null;
+        this.maskBuffer = null;
+
+        this.glData = {
+            selColorLoc: null,
+            screenSizeLoc: null,
+            sdfRadiusLoc: null,
+            isDarkLoc: null
+        }
+
+        this.on('up', this.up.bind(this));
+        this.on('selected', this.selected.bind(this));
+        this.on('deselected', this.deselected.bind(this));
+    }
+
+    // mobile events
+    selected() {
+        if (this.state === WAND_STATE.RENDERING) {
+            this.stopRendering();
+        }
+        this.startSelecting();
+    }
+    deselected() {
+        if (this.state === WAND_STATE.SELECTING) {
+            this.stopSelecting();
+        }
+    }
+
+    up() {
+        switch (this.state) {
+            case WAND_STATE.DISABLED: {
+                this.startSelecting();
+                break;
+            }
+            case WAND_STATE.SELECTING: {
+                this.stopSelecting();
+                break;
+            }
+            case WAND_STATE.RENDERING: {
+                this.stopRendering();
+                if (mobile) {
+                    this.startSelecting();
+                }
+                break;
+            }
+        }
+    }
+
+    mousedown(e) {
+        this.downPos = [e.clientX, e.clientY];
+    }
+
+    mouseup(e) {
+        if (!this.downPos) return;
+
+        const upPos = [e.clientX, e.clientY];
+        if (!isClick(this.downPos, upPos)) {
+            return;
+        }
+
+        this.stopSelecting();
+
+        const boardPos = screenToBoardSpace(...upPos);
+        const boardColId = globals.chunkManager.getChunkPixel(...boardPos);
+        const rgbCol = palette[boardColId];
+
+        this.selectedColor = rgbCol;
+        globals.wandSelectedColor = boardColId;
+
+        this.startRendering();
+    }
+
+    startSelecting() {
+        this.state = WAND_STATE.SELECTING;
+
+        this.changeCursor(1);
+        player.suspendColors();
+
+        globals.eventManager.on('mousedown', this.mouseListeners.down);
+        globals.eventManager.on('mouseup', this.mouseListeners.up);
+    }
+
+    stopSelecting() {
+        this.state = WAND_STATE.DISABLED;
+
+        this.changeCursor(0);
+        player.restoreColors();
+
+        globals.eventManager.off('mousedown', this.mouseListeners.down);
+        globals.eventManager.off('mouseup', this.mouseListeners.up);
+    }
+
+    changeCursor(cursorState) {
+        if (cursorState === 1) {
+            document.body.style.cursor = `url('${wandCursor}') 2 2, auto`;
+        } else {
+            document.body.style.cursor = '';
+        }
+    }
+
+    glRenderMask() {
+        const gl = this.glData.gl;
+
+        gl.viewport(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+
+        const mainCanvas = globals.mainCtx.canvas;
+
+        gl.bindTexture(gl.TEXTURE_2D, this.glData.texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
+            gl.UNSIGNED_BYTE, mainCanvas);
+
+        const [r, g, b] = this.selectedColor;
+
+        gl.uniform4f(this.glData.selColorLoc, r / 255, g / 255, b / 255, 1);
+        gl.uniform2f(this.glData.screenSizeLoc, mainCanvas.width, mainCanvas.height);
+        gl.uniform1f(this.glData.sdfRadiusLoc, 5);
+        gl.uniform1f(this.glData.isDarkLoc, isDarkColor(...this.selectedColor) ? 1 : 0);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+    startRendering() {
+        this.state = WAND_STATE.RENDERING;
+
+        // first time we need to (re)generate it
+        // to prevent the old mask from showing off
+        this.generateMaskCanvas();
+
+        this.fx = new FX(ctx => {
+            if (this.state !== WAND_STATE.RENDERING) {
+                return FX_STATE.REMOVED;
+            }
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
+
+            // handling window resize
+            if (w !== this.maskCanvas.width ||
+                h !== this.maskCanvas.height) {
+                this.generateMaskCanvas();
+            }
+
+            this.glRenderMask();
+
+            ctx.globalAlpha = 0.8;
+            ctx.drawImage(this.maskCanvas, 0, 0);
+            ctx.globalAlpha = 1;
+
+            return FX_STATE.FINISHED;
+        });
+        addFX(this.fx);
+    }
+
+    stopRendering() {
+        this.state = WAND_STATE.DISABLED;
+
+        // cleaning up
+        this.maskCanvas = null;
+        this.maskImData = null;
+        this.maskBuffer = null;
+
+        this.fx = null;
+
+        this.selectedColor = null;
+        globals.wandSelectedColor = null;
+
+        globals.fxRenderer.needRender = true;
+    }
+
+    generateMaskCanvas() {
+        const canvas = document.createElement('canvas');
+        canvas.width = globals.mainCtx.canvas.width;
+        canvas.height = globals.mainCtx.canvas.height;
+
+
+        this.maskCanvas = canvas;
+
+        this.generateShader();
+    }
+    generateShader() {
+        const maskCanvas = this.maskCanvas;
+
+        const fragmentShader = `
+        precision mediump float;
+        uniform sampler2D u_image;
+        uniform vec4 u_selectedColor;
+        uniform vec2 u_screenSize;
+        uniform float u_sdfRadius;
+        uniform float u_isDark;
+        varying vec2 v_texCoord;
+
+        void main() {
+            vec3 outColor = vec3(0.0);
+
+            vec4 color = texture2D(u_image, v_texCoord);
+            float match = all(equal(color, u_selectedColor)) ? 0.0 : 1.0;
+
+            float dx = 1.0 / u_screenSize.x;
+            float dy = 1.0 / u_screenSize.y;
+
+            
+            // process only surrounding pixels
+            if(match == 1.0 && u_isDark == 1.0){
+                float maxLength = length(vec2(u_sdfRadius, u_sdfRadius));
+                float mindist = 10000.0;
+                const float maxRadius = 5.0;
+                for(float x = -maxRadius; x < maxRadius; x++){
+                    if(abs(x) > u_sdfRadius) continue;
+                    for(float y = -maxRadius; y < maxRadius; y++){
+                        if(abs(y) > u_sdfRadius) continue;
+
+                        vec2 newCoord = vec2(dx*x + v_texCoord.x, dy*y + v_texCoord.y);
+                        vec4 color = texture2D(u_image, newCoord);
+                        bool match = all(equal(color, u_selectedColor));
+
+                        if(match){
+                            mindist = min(mindist, length(vec2(x, y)));
+                        }
+                    }
+                }
+                if(mindist != 10000.0){
+                    float norm = 1.0 - mindist / maxLength;
+
+                    outColor = vec3(norm);
+                }
+            }
+
+            gl_FragColor = vec4(outColor, match);
+        }
+        `;
+
+        const { gl, program, texture } = generateShader(maskCanvas, fragmentShader);
+
+        this.glData.selColorLoc = gl.getUniformLocation(program, "u_selectedColor");
+        this.glData.screenSizeLoc = gl.getUniformLocation(program, "u_screenSize");
+        this.glData.sdfRadiusLoc = gl.getUniformLocation(program, "u_sdfRadius");
+        this.glData.isDarkLoc = gl.getUniformLocation(program, "u_isDark");
+
+        this.glData.gl = gl;
+        this.glData.texture = texture;
+    }
+}
+const wand = new MagicWand('wand', 'KeyW', wandIcon);
+
+const COLORADOR_STATE = {
+    DISABLED: 0,
+    SELECTING: 1
+}
+class TemplateColorador extends Tool {
+    constructor(...args) {
+        super(...args);
+
+        this.colorsWhitelist = [];
+        resolveWhenConfigDownloaded().then(() => {
+            this.colorsWhitelist = JSON.parse(getOrDefault('coloradorColors', '[]', true));
+            if (this.colorsWhitelist.length) {
+                addFX(new FX(() => {
+                    if (!template.templateImg?.width) return FX_STATE.IN_PROCESS;
+
+                    try {
+                        this.update();                        
+                    } catch (error) {}
+
+                    return FX_STATE.REMOVED;
+                }));
+            }
+        });
+
+        this.state = COLORADOR_STATE.DISABLED;
+
+        this.on('up', this.up.bind(this));
+        this.on('selected', this.selected.bind(this));
+        this.on('deselected', this.deselected.bind(this));
+
+        this.mouseListeners = {
+            down: this.mousedown.bind(this),
+            up: this.mouseup.bind(this)
+        };
+
+        // needed for the reference
+        this.origTemplateCanvas = null;
+        this.origTemplateCtx = null;
+        // the one that is monkeypatched into the Template
+        this.templateCanvas = null;
+        this.templateUpdated = false;
+
+        this.glData = {
+            imageLoc: null,
+            colorsWhitelistLoc: null,
+            screenSizeLoc: null,
+            disabledOpacityLoc: null,
+            texture: null,
+        }
+    }
+
+    selected() {
+        this.startSelecting();
+    }
+    deselected() {
+        this.stopSelecting();
+    }
+
+    up() {
+        switch (this.state) {
+            case COLORADOR_STATE.DISABLED: {
+                this.startSelecting();
+                break;
+            }
+            case COLORADOR_STATE.SELECTING: {
+                this.stopSelecting();
+                break;
+            }
+        }
+    }
+
+    mmb(colorId) {
+        this.toggleWhitelistColor(palette[colorId]);
+    }
+
+    mousedown(e) {
+        this.downPos = [e.clientX, e.clientY];
+    }
+
+    mouseup(e) {
+        try {
+            if (!this.downPos) return;
+
+            const upPos = [e.clientX, e.clientY];
+            if (!isClick(this.downPos, upPos)) {
+                return;
+            }
+
+            this.regenerateTemplateIfNeeded();
+
+            const boardPos = screenToBoardSpace(...upPos);
+
+            if (this.isOutsideTemplate(...boardPos)) {
+                this.colorsWhitelist.length = 0;
+                this.update();
+                return;
+            }
+
+            const templateCol = this.getTemplateColor(...boardPos);
+            if (!templateCol) return;
+
+            const templateColId = getPaletteColorId(templateCol);
+            if (templateColId === -1) {
+                toastr.warning(t('color_not_in_palette'));
+                return
+            }
+
+            this.toggleWhitelistColor(templateCol);
+        } finally {
+            if (mobile) {
+                this.startSelecting();
+            }
+        }
+    }
+    isOutsideTemplate(boardX, boardY) {
+        const div = template.isPatterns ? 7 : 1
+        const templateW = template.templateImg.width / div;
+        const templateH = template.templateImg.height / div;
+
+        return boardX < template.x || boardY < template.y ||
+            boardX >= template.x + templateW ||
+            boardY >= template.y + templateH;
+    }
+
+
+    getTemplateColor(boardX, boardY) {
+        const temCtx = this.origTemplateCtx;
+
+        const temX = boardX - template.x;
+        const temY = boardY - template.y;
+
+        let color = null;
+        if (!template.isPatterns) {
+            const temColor = temCtx.getImageData(temX, temY, 1, 1).data;
+            // no color if it is opaque
+            if (temColor[3] === 0) {
+                return null;
+            }
+            color = temColor.slice(0, 3);
+        } else {
+            const multedTemX = temX * 7;
+            const multedTemY = temY * 7;
+
+            // finding the color in the 7x7 pattern cell
+            toBreak: for (let x = 0; x < 7; x++) {
+                for (let y = 0; y < 7; y++) {
+                    const curX = multedTemX + x;
+                    const curY = multedTemY + y;
+
+                    const curColor = temCtx.getImageData(curX, curY, 1, 1).data;
+                    // alpha
+                    if (curColor[3] !== 0) {
+                        color = curColor.slice(0, 3);
+                        break toBreak;
+                    }
+                }
+            }
+        }
+
+        return color;
+
+    }
+
+    toggleWhitelistColor(targetCol) {
+        const whitelistColId = this.colorsWhitelist.findIndex(rgb => rgb[0] === targetCol[0] && rgb[1] === targetCol[1] && rgb[2] === targetCol[2]);
+        if (whitelistColId !== -1) {
+            this.removeWhitelistColor(whitelistColId);
+        } else {
+            this.addWhitelistColor(targetCol);
+        }
+    }
+    addWhitelistColor(rgb) {
+        this.colorsWhitelist.push([...rgb]);
+        this.update();
+    }
+    removeWhitelistColor(idx) {
+        this.colorsWhitelist.splice(idx, 1);
+        this.update();
+    }
+
+    updateUIPalette() {
+        $('.paletteColor>img.disabledClr').remove();
+
+        if (!this.colorsWhitelist.length) return;
+
+        $(`.paletteColor`).append(`<img src="${disabledColorSvg}" class="disabledClr">`);
+
+        for (const rgb of this.colorsWhitelist) {
+            const id = getPaletteColorId(rgb);
+            if (id === -1) {
+                console.warn('color', rgb, 'not found in the palette');
+                continue;
+            }
+
+            $(`#col${id}>img.disabledClr`).remove();
+        }
+    }
+
+    update() {
+        setLS('coloradorColors', JSON.stringify(this.colorsWhitelist), true);
+
+        this.regenerateTemplateIfNeeded();
+
+        if (this.colorsWhitelist.length > 0) {
+            this.generateShader();
+            this.renderShader(false);
+            this.patchTemplate();
+        } else {
+            this.unpatchTemplate();
+        }
+
+        this.updateUIPalette();
+    }
+
+    regenerateTemplateIfNeeded() {
+        if (!this.origTemplateCanvas || !this.templateCanvas || this.templateCanvas !== template.templateImg) {
+            this.templateUpdated = true;
+            this.glData.gl = null;
+
+            const templateImg = template.templateImg;
+
+            const origCanv = this.origTemplateCanvas = document.createElement('canvas');
+            const templCanv = this.templateCanvas = document.createElement('canvas');
+
+            origCanv.width = templCanv.width = templateImg.width;
+            origCanv.height = templCanv.height = templateImg.height;
+
+            this.origTemplateCtx = origCanv.getContext('2d');
+            this.origTemplateCtx.drawImage(templateImg, 0, 0);
+        }
+    }
+
+    startSelecting() {
+        this.state = COLORADOR_STATE.SELECTING;
+
+        this.changeCursor(1);
+        player.suspendColors();
+
+        this.clearListeners();
+
+        globals.eventManager.on('mousedown', this.mouseListeners.down);
+        globals.eventManager.on('mouseup', this.mouseListeners.up);
+
+        this.renderShader(true);
+    }
+
+    stopSelecting() {
+        this.state = COLORADOR_STATE.DISABLED;
+
+        this.changeCursor(0);
+        player.restoreColors();
+
+        this.clearListeners();
+        
+        this.renderShader(false);
+    }
+    
+    clearListeners(){
+        globals.eventManager.off('mousedown', this.mouseListeners.down);
+        globals.eventManager.off('mouseup', this.mouseListeners.up);
+    }
+
+    createWhitelistTexture(gl, colors) {
+        const data = new Uint8Array(colors.flat());
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, colors.length, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, data);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        return tex;
+    }
+
+    renderShader(drawDisabled) {
+        if (!this.glData.gl) {
+            this.regenerateTemplateIfNeeded();
+            this.generateShader();
+        }
+
+        if (!this.colorsWhitelist.length) return;
+
+        const gl = this.glData.gl;
+
+
+
+        gl.viewport(0, 0, this.templateCanvas.width, this.templateCanvas.height);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.glData.texture);
+        if (this.templateUpdated) {
+            this.templateUpdated = false;
+
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
+                gl.UNSIGNED_BYTE, this.origTemplateCanvas);
+        }
+        gl.uniform1i(this.glData.imageLoc, 0);
+
+        gl.activeTexture(gl.TEXTURE1);
+        const whitelistTexture = this.createWhitelistTexture(gl, this.colorsWhitelist);
+        gl.bindTexture(gl.TEXTURE_2D, whitelistTexture);
+        gl.uniform1i(this.glData.colorsWhitelistLoc, 1);
+
+        gl.uniform2f(this.glData.screenSizeLoc, mainCanvas.width, mainCanvas.height);
+
+        const disabledOpacity = drawDisabled ? 0.1 : 0;
+        gl.uniform1f(this.glData.disabledOpacityLoc, disabledOpacity);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+    generateShader() {
+        if (!this.colorsWhitelist.length) return;
+
+        const fragmentShader = `
+        #define COLORS_SIZE ${this.colorsWhitelist.length}
+        precision mediump float;
+        uniform sampler2D u_image;
+        uniform sampler2D u_colorsWhitelist;
+        uniform vec2 u_screenSize;
+        uniform float u_disabledOpacity;
+        varying vec2 v_texCoord;
+
+        bool colorMatch(vec3 a, vec3 b) {
+            return distance(a, b) < 0.01;
+        }
+
+        void main() {
+            vec4 color = texture2D(u_image, v_texCoord);
+            
+            if(color.a < 0.001){
+                gl_FragColor = color;
+                return;
+            }
+
+            for(int i = 0; i < COLORS_SIZE; i++){
+                vec3 wl = texture2D(u_colorsWhitelist, vec2((float(i) + 0.5) / float(COLORS_SIZE), 0.5)).rgb;
+                if(colorMatch(wl, color.rgb)){
+                    gl_FragColor = color;
+                    return;
+                }
+            }
+
+            
+            gl_FragColor = vec4(0.0, 0.0, 0.0, u_disabledOpacity);
+        }
+        `;
+
+        let existingGl = this.glData.gl;
+        const { gl, program, texture } = generateShader(existingGl ?? this.templateCanvas, fragmentShader, existingGl ? false : true);
+
+        this.glData.imageLoc = gl.getUniformLocation(program, "u_image");
+        this.glData.colorsWhitelistLoc = gl.getUniformLocation(program, "u_colorsWhitelist");
+        this.glData.screenSizeLoc = gl.getUniformLocation(program, "u_screenSize");
+        this.glData.disabledOpacityLoc = gl.getUniformLocation(program, "u_disabledOpacity");
+
+        this.glData.gl = gl;
+        if (texture) {
+            this.glData.texture = texture;
+        }
+    }
+
+    patchTemplate() {
+        template.templateImg = this.templateCanvas;
+        globals.fxRenderer.needRender = true;
+    }
+    unpatchTemplate() {
+        template.templateImg = this.origTemplateCanvas;
+        globals.fxRenderer.needRender = true;
+    }
+
+    changeCursor(cursorState) {
+        if (cursorState === 1) {
+            document.body.style.cursor = `url('${disableCur}') 0 0, auto`;
+        } else {
+            document.body.style.cursor = '';
+        }
+    }
+}
+const colorador = new TemplateColorador('colorador', 'KeyD', disableIcon);
+
 export default {
     clicker,
     mover,
@@ -2294,5 +3028,7 @@ export default {
     incBrush, decBrush,
     pixelInfo,
     text,
-    resetColors
+    resetColors,
+    wand,
+    colorador
 }
