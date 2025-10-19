@@ -187,7 +187,7 @@ class Chat {
         const realNick = nick;
 
         if (nick === 'Goroh') {
-            nick = `<span style="text-shadow:0 0 3px">[#00f986]${nick}</span>`
+            nick = `<span style="text-shadow:0 0 3px">[#0]${nick}</span>`
         }
 
         try {
@@ -212,8 +212,8 @@ class Chat {
 
         $('.messageNick', msgEl).on('click', function () {
             const visibleNick = this.innerText.slice(0, -1);
-            globals.elements.chatInput.value += visibleNick + ', ';
-            globals.elements.chatInput.focus();
+            chatInput[0].value += visibleNick + ', ';
+            chatInput.trigger('focus');
         })
 
         this.logElems[channel].append(msgEl);

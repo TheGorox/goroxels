@@ -58,6 +58,10 @@ export function initDraggableInputs() {
             if (dragging) {
                 input.dispatchEvent(new Event('change', { bubbles: true }));
             }
+            
+            if(e.target === input){
+                $(input).trigger('focus');
+            }
 
             document.body.style.userSelect = '';
             document.body.style.cursor = '';

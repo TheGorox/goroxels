@@ -76,9 +76,9 @@ class Template {
             canvasW = this.templateResizeW;
             // sometimes AR does not align template properly
             // so we need to divide by the pattern size(7) manually
-            if(this.templateImg.width / this.templateResizeW === 7){
+            if (this.templateImg.width / this.templateResizeW === 7) {
                 canvasH = Math.floor(this.templateImg.height / 7);
-            }else{
+            } else {
                 const ar = this.templateImg.width / this.templateImg.height;
                 canvasH = Math.floor(this.templateResizeW / ar);
             }
@@ -108,7 +108,7 @@ class Template {
         globals.fxRenderer.requestRender();
     }
 
-    static parseImageUrl(url){
+    static parseImageUrl(url) {
         let width = null;
         let match;
         if (match = url.match(widthRegEx)) {
@@ -140,6 +140,12 @@ class Template {
         this.templateResizeW = parsedWidth;
 
         globals.fxRenderer.requestRender();
+    }
+
+    get isPatterns() {
+        return !isNaN(this.templateResizeW) &&
+            this.templateImg.width % 7 == 0 &&
+            this.templateImg.height % 7 == 0;
     }
 }
 const template = new Template();
@@ -292,8 +298,8 @@ export function initTemplateMobileMove() {
     }
 
     function mousemove(e) {
-        if(e.gesture) return;
-        
+        if (e.gesture) return;
+
         const boardPos = screenToBoardSpace(e.clientX, e.clientY);
         boardPos[0] |= 0;
         boardPos[1] |= 0;
@@ -303,7 +309,7 @@ export function initTemplateMobileMove() {
         if (lastX === lastPressCord[0] && lastY === lastPressCord[1])
             return;
 
-        console.log({lastX, lastY, boardPos, lastPressCord})
+        console.log({ lastX, lastY, boardPos, lastPressCord })
 
         xInput.val(template.x -= lastPressCord[0] - lastX);
         yInput.val(template.y -= lastPressCord[1] - lastY);
@@ -315,7 +321,7 @@ export function initTemplateMobileMove() {
         saveTemplate();
     }
 
-    function mouseup(){
+    function mouseup() {
         globals.eventManager.off('mousemove', mousemove);
     }
 
@@ -343,7 +349,7 @@ export function initTemplateMobileMove() {
     // (to prevent tools doing their job during the placement) 
     // we need to rewrite whole eventManager
     let savedTool, savedColors;
-    function saveAndResetTool(){
+    function saveAndResetTool() {
         savedTool = globals.toolManager.tool;
         savedColors = [player.color, player.secondCol];
 
@@ -351,7 +357,7 @@ export function initTemplateMobileMove() {
         player.resetColors();
     }
 
-    function restoreTool(){
+    function restoreTool() {
         globals.toolManager.selectTool(savedTool);
         [player.color, player.secondCol] = savedColors;
     }

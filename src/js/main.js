@@ -19,23 +19,20 @@ import { initInputs, initOtherCoolFeatures } from './init';
 import { toggleTopMenu } from './ui/toggles';
 import { fixColorsWidth } from './ui/config';
 import { fixChatPosition } from './Chat';
+import { fxCanvas, mainCanvas } from './ui/elements';
 
 (async () => {    
     indexedDb.init();
     await config.download();
 
-    const {
-        elements,
-    } = globals;
-
     window.onresize = () => {
-        elements.mainCanvas.width = window.innerWidth;
-        elements.mainCanvas.height = window.innerHeight;
+        mainCanvas[0].width = window.innerWidth;
+        mainCanvas[0].height = window.innerHeight;
 
-        elements.fxCanvas.width = window.innerWidth;
-        elements.fxCanvas.height = window.innerHeight;
+        fxCanvas[0].width = window.innerWidth;
+        fxCanvas[0].height = window.innerHeight;
 
-        const fxCtx = elements.fxCanvas.getContext('2d');
+        const fxCtx = fxCanvas[0].getContext('2d');
 
         ctx.imageSmoothingEnabled = fxCtx.imageSmoothingEnabled = false;
         ctx.webkitImageSmoothingEnabled = fxCtx.webkitImageSmoothingEnabled = false;
@@ -56,7 +53,7 @@ import { fixChatPosition } from './Chat';
 
 
     window.oncontextmenu = function (e) {
-        if (e.target === globals.elements.mainCanvas ||
+        if (e.target === mainCanvas[0] ||
             e.target.classList[0] === 'paletteColor' ||
             (e.path && e.path[1].classList[0] === 'paletteColor')) {
             e.preventDefault();
@@ -99,15 +96,24 @@ import { fixChatPosition } from './Chat';
             f.call(player, id);
         }
 
+        // only for MMB events
+        el.onmouseup = e => {
+            if(e.button !== 1){
+                return;
+            }
+
+            globals.toolManager.tools['colorador'].mmb(id);
+        }
+
         el.oncontextmenu = () => {
             // right button click
             player.switchSecondColor(id);
         }
 
-        elements.palette.appendChild(el);
+        palette.append(el);
     })
 
-    const ctx = elements.mainCanvas.getContext('2d');
+    const ctx = mainCanvas[0].getContext('2d');
     ctx.imageSmoothingEnabled = false;
 
     const wsPort = location.protocol === 'https:' ? 443 : (location.port || 80);
