@@ -1,3 +1,8 @@
+const bayer2x2 = [
+    [0, 2],
+    [3, 1]
+];
+
 const bayer4x4 = [
     [0, 8, 2, 10],
     [12, 4, 14, 6],
@@ -51,7 +56,7 @@ const custom8x8 = [
     [0, 0, 0, 3, 21, 0, 0, 18],
     [0, 5, 4, 2, 0, 20, 19, 17],
     [0, 0, 0, 1, 0, 0, 0, 16]
-]; // yes, penises
+]; // yessir, penises
 
 const custom7x7 = [
     [1, 3, 37, 9, 11, 45, 43],
@@ -63,7 +68,8 @@ const custom7x7 = [
     [35, 25, 23, 34, 32, 21, 19]
 ];
 
-module.exports = {
+export default {
+    2: bayer2x2,
     4: bayer4x4,
     8: bayer8x8,
     16: bayer16x16,

@@ -44,68 +44,84 @@ export default class Renderer {
         }
 
         this.preRender();
+        this.initAndroidGcChecker();
     }
 
-    preRender(){
+    preRender() {
         this.preRenderBrush();
     }
 
-    preRenderBrush(){
+    preRenderBrush() {
         // TODO make it render only before brush used
         // because it renders on every zoom
         const size = player.brushSize,
             zoom = camera.zoom;
-        
-        if(zoom < 1) return
+
+        if (zoom < 1) return
 
         const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = zoom*(size+1);
+        canvas.width = canvas.height = zoom * (size+2);
         const ctx = canvas.getContext('2d');
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
-        const r = size/2;
-
-        const circle = shapes.filledCircle(0, 0, r);
-        let circleMatrix = [];
-        for(let y = 0; y < size+1; y++){
-            circleMatrix.push((new Array(size+1)).fill(0))
+        let r = Math.floor(size / 2);
+        
+        let circle
+        if(size === 2){
+            r = 0;
+            circle = [[0,0],[1,0],[0,1],[1,1]]
+        }else{
+            circle = shapes.filledCircle(0, 0, r+1);
         }
-        
+        let circleMatrix = [];
+        for (let y = 0; y < size + 1; y++) {
+            circleMatrix.push((new Array(size + 1)).fill(0))
+        }
+
         circle.forEach(([x, y]) => {
-            circleMatrix[x+r][y+r] = 1;
+            circleMatrix[x + r][y + r] = 1;
         })
-        
+
+        const lineW = zoom / 8;
+        const halfLineW = lineW / 2;
+
         ctx.beginPath();
-        ctx.lineWidth = zoom / 4;
+        ctx.lineWidth = lineW;
         ctx.strokeStyle = hexPalette[player.color];
-        ctx.lineCap = 'square';
+        ctx.lineCap = 'butt';
 
-        ctx.fillStyle = 'blue';
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                if (isBound(x, y)) continue;
 
-        for(let x = 0; x < size; x++){
-            for(let y = 0; y < size; y++){
-                if(isBound(x, y)) continue;
-
-                let upper = isBound(x, y-1),
+                let upper = isBound(x, y - 1),
                     left = isBound(x - 1, y),
                     right = isBound(x + 1, y),
                     bottom = isBound(x, y + 1);
 
-                if(upper){
-                    ctx.moveTo(x*zoom, y*zoom);
-                    ctx.lineTo((x+1)*zoom, y*zoom);
+                if (upper) {
+                    // the margin is for join neighbouring lines
+                    const margin = !isBound(x + 1, y) ? lineW : 0;
+
+                    ctx.moveTo(x * zoom, y * zoom + halfLineW);
+                    ctx.lineTo((x + 1) * zoom + margin, y * zoom + halfLineW);
                 }
-                if(left){
-                    ctx.moveTo(x*zoom, y*zoom);
-                    ctx.lineTo(x*zoom, (y+1)*zoom);
+                if (left) {
+                    const margin = !isBound(x, y - 1) ? lineW : 0;
+
+                    ctx.moveTo(x * zoom + halfLineW, y * zoom - margin);
+                    ctx.lineTo(x * zoom + halfLineW, (y + 1) * zoom);
                 }
-                if(right){
-                    ctx.moveTo((x+1)*zoom, y*zoom);
-                    ctx.lineTo((x+1)*zoom, (y+1)*zoom);
+                if (right) {
+                    const margin = !isBound(x, y + 1) ? lineW : 0;
+                    
+                    ctx.moveTo((x + 1) * zoom - halfLineW, y * zoom);
+                    ctx.lineTo((x + 1) * zoom - halfLineW, (y + 1) * zoom + margin);
                 }
-                if(bottom){
-                    ctx.moveTo((x+1)*zoom, (y+1)*zoom);
-                    ctx.lineTo(x*zoom, (y+1)*zoom);
+                if (bottom) {
+                    const margin = !isBound(x - 1, y) ? lineW : 0;
+
+                    ctx.moveTo((x + 1) * zoom, (y + 1) * zoom - halfLineW);
+                    ctx.lineTo(x * zoom - margin, (y + 1) * zoom - halfLineW);
                 }
             }
         }
@@ -113,10 +129,8 @@ export default class Renderer {
         ctx.stroke();
         ctx.closePath();
 
-        function isBound(x, y){
-            // check is pixel opaque/out of array
-
-            if(x < 0 || x >= size || y < 0 || y >= size) return true;
+        function isBound(x, y) {
+            if (x < 0 || x >= size || y < 0 || y >= size) return true;
 
             return !circleMatrix[x][y];
         }
@@ -127,8 +141,28 @@ export default class Renderer {
         this.preRendered.brush.circle = circle;
     }
 
-    requestRender(){
-        if(this.needRender){
+    initAndroidGcChecker() {
+        setInterval(() => {
+            this.checkAndroidGc();
+        }, 1000);
+    }
+
+    // check chunks for being cleared by aggressive android gc
+    checkAndroidGc() {
+        if (!globals.mobile) return;
+        const bad = this.ctx.imageSmoothingEnabled;
+        if (bad) {
+            console.log('detected broken render, repairing');
+
+            // workaround
+            window.onresize();
+
+            globals.chunkManager.reRenderAll();
+        }
+    }
+
+    requestRender() {
+        if (this.needRender) {
             this.needRender = false;
 
             this.render()
@@ -137,8 +171,8 @@ export default class Renderer {
         globals.fxRenderer.render();
     }
 
-    correctSmoothing(){
-        if(isMobile) return;
+    correctSmoothing() {
+        if (isMobile) return;
 
         if (camera.zoom < 1) {
             this.ctx.imageSmoothingEnabled = true;
@@ -163,14 +197,14 @@ export default class Renderer {
 
         let zoom = camera.zoom;
 
-        if(zoom === 1){
+        if (zoom === 1) {
             // for Firefox, to render normally at least on zoom 1
             camX = Math.floor(camX)
             camY = Math.floor(camY)
         }
 
         this.ctx.save();
-        this.ctx.translate(Math.floor(-camX*zoom), Math.floor(-camY*zoom));
+        this.ctx.translate(Math.floor(-camX * zoom), Math.floor(-camY * zoom));
         this.ctx.scale(zoom, zoom);
 
         visibleChunks.forEach(chunkCord => {
@@ -180,12 +214,12 @@ export default class Renderer {
             let offY = cy * chunkSize;
 
 
-            if (!globals.chunkManager.hasChunk(cx, cy)){
+            if (!globals.chunkManager.hasChunk(cx, cy)) {
                 globals.chunkManager.loadChunk(cx, cy);
 
                 // search for chunk preview placeholder
                 let chunkPreview = this.chunkPreviews[`${cx}-${cy}`];
-                if(!chunkPreview){
+                if (!chunkPreview) {
                     // create one if not found (one-time op)
                     chunkPreview = this.chunkPreviews[`${cx}-${cy}`] = {
                         loaded: false,
@@ -196,26 +230,26 @@ export default class Renderer {
                         chunkPreview.loaded = true;
                         this.needRender = true;
                     });
-                }else if (chunkPreview.loaded && chunkPreview.data !== null){
+                } else if (chunkPreview.loaded && chunkPreview.data !== null) {
                     // or, render it if it's loaded and found in db
                     this.ctx.drawImage(chunkPreview.data, offX, offY, chunkSize, chunkSize);
 
                     // also render default placeholder over it, to clarify we are dealing with preview
-                    if(this.chunkPlaceholderPattern.loaded){
+                    if (this.chunkPlaceholderPattern.loaded) {
                         this.ctx.globalAlpha = 0.5;
                         this.ctx.drawImage(this.chunkPlaceholderPattern.canvas, offX, offY, chunkSize, chunkSize);
                         this.ctx.globalAlpha = 1;
                     }
-                }else {
+                } else {
 
                     // fallback to default placeholder if available
-                    if(this.chunkPlaceholderPattern.loaded)
+                    if (this.chunkPlaceholderPattern.loaded)
                         this.ctx.drawImage(this.chunkPlaceholderPattern.canvas, offX, offY, chunkSize, chunkSize);
                 }
 
                 return
             }
-            
+
             const chunk = globals.chunkManager.getChunk(cx, cy);
 
             chunk.render();

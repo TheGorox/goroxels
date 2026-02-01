@@ -18,6 +18,9 @@ function pad(pad, str, padLeft) {
         return (str + pad).substring(0, pad.length);
     }
 }
+function padZeros(str, count = 2) {
+    return (str.toString()).padStart(count, '0');
+}
 
 const colorRegEx = new RegExp(/\[(#?[A-Z0-9]{1,8})*?\]/gi);
 // https : / / host.com/img .png       ? q=321123
@@ -204,8 +207,25 @@ class Chat {
 
         const isMuted = ~this.muted.indexOf(realNick);
 
+        let timeFormatted = '', fullDateFormatted = '';
+        if (message.time) {
+            const date = new Date(message.time);
+            const dd = padZeros(date.getDate());
+            const MM = padZeros(date.getMonth() + 1);
+            const yy = date.getFullYear() - 2000;
+
+            
+            const hh = padZeros(date.getHours());
+            const mm = padZeros(date.getMinutes());
+            const ss = padZeros(date.getSeconds());
+            
+            timeFormatted = `[${hh}:${mm}]`;
+            fullDateFormatted = `${dd}.${MM}.${yy} [${hh}:${mm}:${ss}]`;
+        }
+
         const msgEl = $(
             `<div class="chatMessage" ${isMuted ? 'style="display:none"' : ''}>
+            <span class="messageTime" title="${fullDateFormatted}">${timeFormatted}</span>
             <div class="messageNick" data-nick="${realNick}">${nick}:</div>
             <div class="messageText">${text}</div>
         </div>`);
@@ -406,7 +426,7 @@ const chat = new Chat();
 
 export function initChat() {
     $(document).on('keydown', e => {
-        if(globals.lockInputs) return;
+        if (globals.lockInputs) return;
         if (e.key !== 'Enter') return;
 
         if ($('#chatInput').is(':focus') || globals.mobile) {

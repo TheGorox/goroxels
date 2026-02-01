@@ -1,7 +1,7 @@
 import toastr from 'toastr';
 
 import chat, { fixChatPosition, toggleEmojis, updateEmojis } from './Chat';
-import { game, showProtected } from './config';
+import { game, palettePreviews, palettes, showProtected } from './config';
 import { ROLE, ROLE_I } from './constants';
 import { urlInput } from './ui/elements';
 import globals from './globals';
@@ -14,7 +14,8 @@ import User from './user';
 import Window, { ConfirmModal } from './Window';
 import { getLS, getOrDefault, setLS } from './utils/localStorage';
 import { capitalize } from './utils/strings';
-import { decodeKey, getEventKeyCode, htmlspecialchars, makeScreenshot, reverseFade, stringifyKeyEvent } from './utils/misc';
+import { decodeKey, getEventKeyCode, htmlspecialchars, reverseFade, stringifyKeyEvent } from './utils/misc';
+import { makeScreenshot } from './utils/screenshot';
 
 import arrowSvg from '../img/arrow.svg';
 import desktopIcon from '../img/icon-desktop.svg';
@@ -31,7 +32,8 @@ import mb4Icon from '../img/mouse/mouse-4mb.png';
 import mb5Icon from '../img/mouse/mouse-5mb.png';
 import { apiRequest, fetchCaptcha, solveCaptcha } from './utils/api';
 import { shareTemplate, showTemplates, updateTemplate } from './template';
-import { setPaletteColorsSize, showPatternsOnPalette, swapToolsPos, unloadPalettePatterns } from './ui/config';
+import { setPaletteColorsSize, swapToolsPos, unloadPalettePatterns } from './ui/config';
+import { paletteChosen, showPatternsOnPalette } from "./ui/palette";
 
 
 const mouseKeys = {
@@ -457,6 +459,43 @@ export function uiSettings() {
     });
 }
 
+export function showPaletteSelect(){
+    if(Window.Exists(t('select_palette_title'))){
+        return;
+    }
+
+    
+    const selectWin = new Window({
+        title: t('select_palette_title'),
+        center: true
+    });
+    const paletteCards = [];
+    for(const curPalette of palettes){
+        const {name} = curPalette;
+        const card = $(`
+            <div class="paletteCard">
+                <div class="paletteTitle">${name}</div>
+                <div class="palettePreview">
+                    <img src="${palettePreviews[name]}"></img>
+                </div>
+            </div>
+            `);
+        paletteCards.push(card);
+
+        card.one('click', () => {
+            paletteChosen(name);
+
+            selectWin.close();
+        })
+    }
+    const paletteCardsCont = $(`<div class="paletteCards"></div>`);
+    paletteCards.forEach(card => paletteCardsCont.append(card));
+    $(selectWin.body).append(paletteCardsCont);
+    $(selectWin.body).css('width', '90vw').css('max-width', '450px');
+
+    $(document.body).append(selectWin.element);
+}
+
 export function gameSettings() {
     const win = new Window({
         title: capitalize(t('game settings')),
@@ -467,7 +506,7 @@ export function gameSettings() {
     // 1 for guests (packets disabled by server), 20 for admins, and 10 for others 
     let maxBrushSize = (me.role === ROLE.ADMIN ? 20 : (me.role < ROLE.USER ? 1 : 10))
 
-    const table = generateTable([
+    const tableOptions = [
         [
             t('show protected'),
             `<input type="checkbox" id="showProtected" ${game.showProtected ? 'checked' : ''}>`
@@ -500,9 +539,18 @@ export function gameSettings() {
             t('draw line length'),
             `<input type="checkbox" id="drawLineLenCB" ${tools.line.drawLength ? 'checked' : ''} title="draw line length near it">`
         ],
-    ]);
+    ];
+
+    if(palettes){
+        tableOptions.unshift([
+            `<button id="changePaletteBtn">${t('change_palette')}</button>`
+        ])
+    }
+    const table = generateTable(tableOptions);
 
     $(win.body).append(table);
+
+    $('#changePaletteBtn').on('click', showPaletteSelect);
 
     $('#showProtected').on('change', e => {
         const show = e.target.checked;
@@ -997,7 +1045,7 @@ export function templatesWindow(templatesJson) {
 
         const templateEl = $(
             `<div class="templateItem ${meOwner ? 'myTemplateItem' : ''}">
-                <button class="templateBtn ${canDelete ? 'deleteBtn' : ''}"></button>
+                ${canDelete ? '<button class="templateBtn deleteBtn"></button>' : ''}
                 <button class="templateBtn infoBtn">i</button>
                 <img src="${templateThumbLink}" alt="thumbnail">
                 <div class="templateName">${tempJson.name}</div>
@@ -1068,4 +1116,5 @@ export function templatesWindow(templatesJson) {
         })
     }
 }
+
 

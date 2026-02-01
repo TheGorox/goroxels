@@ -8,7 +8,7 @@ import {
 import {
     canvasId,
     canvasName,
-    palette
+    allColors
 } from './config'
 import globals from './globals'
 import User from './user';
@@ -18,6 +18,7 @@ import Window, { Modal } from './Window';
 import player, { updatePlaced } from './player';
 import { translate as t } from './translate';
 import { htmlspecialchars } from './utils/misc';
+import workers from '../workers';
 
 export default class Socket extends EventEmitter {
     constructor(port) {
@@ -32,6 +33,11 @@ export default class Socket extends EventEmitter {
         this.connectedOnce = false;
 
         this.reconnectFactor = 1;
+
+        this.keepAliveInterval = null;
+        this.alive = false;
+
+        this.serverJitter = 0;
 
         this.connect();
     }
@@ -53,18 +59,27 @@ export default class Socket extends EventEmitter {
             console.log('Socket has been connected');
 
             if (!this.connectedOnce) this.connectedOnce = true;
+
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = setInterval(() => {
+                if (!this.connected) return;
+                if (!this.alive) return this.close();
+                this.alive = false;
+            }, 45000);
         }
 
         this.socket.onmessage = this.onmessage.bind(this);
 
         this.socket.onclose = () => {
             this.emit('closed');
+            clearInterval(this.keepAliveInterval);
+
             Object.values(globals.users).forEach(u => u.close(u.id));
             globals.users = {};
 
             globals.chunkManager.clearLoadingChunks();
 
-            const reconnectDelay = Math.min(this.reconnectFactor * 1000 - Math.random() * 1000, 60_000);
+            const reconnectDelay = Math.min(this.reconnectFactor * 1000 - Math.random() * 1000, 10_000);
             setTimeout(() => {
                 console.log('reconnect');
                 this.reconnect();
@@ -260,7 +275,7 @@ export default class Socket extends EventEmitter {
                     y = dv.getUint16(i + 2);
                     col = dv.getUint8(i + 4);
 
-                    if (col > palette.length) continue;
+                    if (col > allColors.length) continue;
 
                     if (isProtect) {
                         this.emit('protect', x, y, col);
@@ -276,7 +291,11 @@ export default class Socket extends EventEmitter {
             }
 
             case OPCODES.ping: {
+                this.alive = true;
                 this.reconnectFactor = 1;
+
+                const serverTime = Number(dv.getBigUint64(1, false));
+                this.serverJitter = Date.now() - serverTime;
 
                 this.socket.send(new Uint8Array([OPCODES.ping]));
                 break
@@ -296,7 +315,7 @@ export default class Socket extends EventEmitter {
                     const c = dv.getUint8(off + 4);
                     const placerId = dv.getUint32(off + 5);
 
-                    if (c > palette.length) continue;
+                    if (c > allColors.length) continue;
 
                     this.onIncomingPixel([x, y, c], placerId);
                 }
@@ -307,6 +326,27 @@ export default class Socket extends EventEmitter {
                 const type = dv.getUint8(1);
                 this.emit('radio', type);
                 break
+            }
+
+            case OPCODES.pastePixels: {
+                const startX = dv.getInt16(1);
+                const startY = dv.getInt16(3);
+                const width = dv.getInt16(5);
+
+                const u8a = new Uint8Array(dv.buffer, 7);
+                workers.compressWorker.decompress(u8a).then(decompressed => {
+                    for (let i = 0; i < decompressed.length; i++) {
+                        const x = startX + (i % width);
+                        const y = startY + Math.floor(i / width);
+                        const col = decompressed[i];
+
+                        this.emit('place', x, y, col, 0);
+                    }
+                }).catch(err => {
+                    console.error('cannot decompress pastePixels data:', err);
+                });
+
+                break;
             }
         }
     }
@@ -325,6 +365,7 @@ export default class Socket extends EventEmitter {
         this.emit('place', x, y, col, id);
 
         // does not work, id is not player id
+        // TODO: remove this? 
         if (id === player.id)
             updatePlaced(player.placedCount++);
     }

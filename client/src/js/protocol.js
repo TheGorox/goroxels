@@ -9,7 +9,8 @@ export const OPCODES = {
     captcha:     0x5,
     ping:        0x6,
     placeBatch:  0x7,
-    updateRadio: 0x8
+    updateRadio: 0x8,
+    pastePixels: 0x9
 }
 
 export const STRING_OPCODES = {

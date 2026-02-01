@@ -6,6 +6,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 // const JavaScriptObfuscator = require('webpack-obfuscator');
 const CircularDependencyPlugin = require('circular-dependency-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 /*const ExtractTextPlugin = require('extract-text-webpack-plugin');*/
 
@@ -24,7 +25,7 @@ const config = {
     output: {
         filename: '[name].[chunkhash].bundle.js',
         path: path.resolve(__dirname, 'dist'),
-        publicPath: '.'
+        publicPath: ''
     },
     module: {
         rules: [{
@@ -76,6 +77,13 @@ const config = {
             }
             ],
         },
+        // {
+        //     test: /\.worker\.js$/i,
+        //     type: 'asset/resource',
+        //     generator: {
+        //         filename: 'workers/[name].[contenthash].js'
+        //     }
+        // },
 
         // workaround for converters
         {
@@ -85,16 +93,6 @@ const config = {
                 type: `module`,
                 exports: `converter`,
             },
-        },
-        {
-            test: /converter\.wasm$/,
-            use: [{
-                loader: 'file-loader',
-                options: {
-                    outputPath: '/wasm/',
-                    name: 'converter.wasm'
-                }
-            }]
         }]
     },
     plugins: [
@@ -129,6 +127,14 @@ const config = {
         new webpack.ProvidePlugin({
             '$': 'jquery',
             'toastr': 'toastr'
+        }),
+        new CopyWebpackPlugin({
+            patterns: [
+                {
+                    from: path.resolve(srcDir, 'audio'),
+                    to: 'audio'
+                }
+            ]
         })
     ],
     optimization: {
@@ -144,6 +150,9 @@ const config = {
                 }
             }
         }
+    },
+    experiments: {
+        asyncWebAssembly: true
     }
 };
 

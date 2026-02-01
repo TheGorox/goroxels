@@ -9,10 +9,10 @@ import player from '../player';
 
 import winampFontPng from '../../font/pixel/winamp.png';
 import winampFontDesc from '../../font/pixel/winamp.txt';
-import { PixelFont } from '../tools';
 
 import startBtnImg from '../../img/winamp/enableRadioBtn.png';
 import { apiRequest } from '../utils/api';
+import { PixelFont } from '../tools/text.js';
 
 
 async function importMaterials() {

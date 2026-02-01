@@ -7,7 +7,7 @@ import {
     chunkSize
 } from '../config';
 
-export function screenToBoardSpace(clientX, clientY) {
+export function screenToBoardSpace(clientX, clientY, rounded = true) {
     let screenOffsetX = (clientX - (globals.renderer.canvas.width >> 1)) / camera.zoom;
     let screenOffsetY = (clientY - (globals.renderer.canvas.height >> 1)) / camera.zoom;
 
@@ -17,20 +17,30 @@ export function screenToBoardSpace(clientX, clientY) {
     let x = boardOffsetX + screenOffsetX,
         y = screenOffsetY + boardOffsetY;
 
-    return [x | 0, y | 0]
+    if (rounded) {
+        x = Math.floor(x);
+        y = Math.floor(y);
+    }
+
+    return [x, y]
 }
 
-export function boardToScreenSpace(x, y) {
+export function boardToScreenSpace(x, y, round=true) {
     x -= camera.x + halfMap[0];
     y -= camera.y + halfMap[1];
 
     x *= camera.zoom;
     y *= camera.zoom;
 
-    x += globals.renderer.canvas.width >> 1; // x >> 1 = x / 2
-    y += globals.renderer.canvas.height >> 1;
+    x += globals.renderer.canvas.width / 2; // x >> 1 = x / 2
+    y += globals.renderer.canvas.height / 2;
 
-    return [Math.floor(x), Math.floor(y)]
+    if(round){
+        x = Math.floor(x);
+        y = Math.floor(y);
+    }
+
+    return [x, y]
 }
 
 export function boardToChunk(x, y) {

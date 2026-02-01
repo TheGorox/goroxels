@@ -63,56 +63,6 @@ import { fxCanvas, mainCanvas } from './ui/elements';
     camera.init();
     initHalfmap();
 
-    config.palette.forEach((color, id) => {
-        const el = document.createElement('div');
-        el.style.backgroundColor = `rgb(${color.join(',')})`;
-        // el.classList = ['paletteColor ' + (isDarkColor(...color) ? 'dark' : 'light')];
-        el.classList = ['paletteColor light'];
-        el.id = 'col' + id;
-
-        // detect long press
-        let downtime = 0;
-
-        var $el = $(el);
-
-        $el.on('pointerdown', () => {
-            downtime = Date.now();
-        })
-
-        $el.on('pointerleave', () => {
-            downtime = 0;
-        })
-
-        el.onclick = e => {
-            let isLong = false;
-            if (downtime != 0) {
-                if (Date.now() - downtime > 700) {
-                    isLong = true;
-                }
-                downtime = 0;
-            }
-
-            let f = isLong ? player.switchSecondColor : player.switchColor;
-            f.call(player, id);
-        }
-
-        // only for MMB events
-        el.onmouseup = e => {
-            if(e.button !== 1){
-                return;
-            }
-
-            globals.toolManager.tools['colorador'].mmb(id);
-        }
-
-        el.oncontextmenu = () => {
-            // right button click
-            player.switchSecondColor(id);
-        }
-
-        palette.append(el);
-    })
-
     const ctx = mainCanvas[0].getContext('2d');
     ctx.imageSmoothingEnabled = false;
 
@@ -134,7 +84,7 @@ import { fxCanvas, mainCanvas } from './ui/elements';
     globals.player = player;
 
     const renderLoop = () => {
-        requestAnimationFrame(() => {
+        requestAnimationFrame(() => {            
             renderer.requestRender();
             renderLoop();
         })

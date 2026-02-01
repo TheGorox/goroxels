@@ -1,65 +1,68 @@
-import {
-    rgb2abgr,
-    rgb2hex
-} from './utils/color'
-import { getOrDefault } from './utils/localStorage'
+import { rgb2abgr, rgb2hex } from './utils/color';
+import { getOrDefault } from './utils/localStorage';
+import config from '../../../shared/config';
 
 export let canvasId;
-
-export let
-    canvasName,
-    chunkSize,
-    boardWidth, boardHeight,
-    palette
-
+export let canvasName, chunkSize, boardWidth, boardHeight, allColors, currentPaletteColors, currentPalette, palettes;
 export let downloaded = false;
 
-export let
-    // a palette for fast rendering
-    bgrPalette, hexPalette,
-    boardChunkWid, boardChunkHei,
-    cooldown;
+export let bgrPalette, hexPalette, boardChunkWid, boardChunkHei, cooldown;
 
 export const game = {
     chatLimit: parseInt(getOrDefault('chatLimit', 100), 10),
-    showProtected: false
+    showProtected: false,
+};
+
+export let palettePreviews = {};
+const requirePreview = require.context('../img/palettePreviews', false, /\.png$/);
+requirePreview.keys().map(requirePreview).forEach(path => {
+    const filename = path.default.match(/([\w\d_\s]+)\.png$/);
+    palettePreviews[filename[1]] = path.default;
+});
+
+export function setCurrentPalette(palette){
+    let startIdx = 0, endIdx = allColors.length;
+    if (!palette) {
+        currentPaletteColors = allColors;
+    } else {
+        currentPalette = palette;
+
+        startIdx = palette.slice[0];
+        endIdx = palette.slice[1] || endIdx;
+
+        currentPaletteColors = allColors.slice(startIdx, endIdx);
+    }
+
+    return [currentPaletteColors, startIdx, endIdx];
 }
+
 
 export let argbToId = {};
 
-async function loadConfig(){
-    const response = await fetch('/config.json');
-    return await response.json();
-}
-
 export async function download() {
-    let config
-    try{
-        config = await loadConfig();
-    }catch(e){
-        toastr.error('Failed to load config from server. Try to reload the page');
-    }
-
     const path = document.location.pathname.replace(/[^\d^\w]/g, '');
-    let index = config.canvases.findIndex(canvas => canvas.name === path);
+    const index = config.canvases.findIndex(canvas => canvas.name === path);
     canvasId = index === -1 ? 0 : index;
 
-    let canvasCfg = config.canvases[canvasId];
+    const canvasCfg = config.canvases[canvasId];
 
-    canvasName = canvasCfg.name,
-        chunkSize = canvasCfg.chunkSize,
-        boardWidth = canvasCfg.boardWidth * chunkSize,
-        boardHeight = canvasCfg.boardHeight * chunkSize,
-        palette = canvasCfg.palette;
+    canvasName = canvasCfg.name;
+    chunkSize = canvasCfg.chunkSize;
+    boardWidth = canvasCfg.boardWidth * chunkSize;
+    boardHeight = canvasCfg.boardHeight * chunkSize;
+    allColors = currentPaletteColors = canvasCfg.palette;
+    palettes = canvasCfg.extra?.palettes ?? null;
 
-    // palette for fast rendering
-    bgrPalette = new Uint32Array(palette.map((rgb) => rgb2abgr(...rgb))),
-        hexPalette = palette.map(rgb2hex),
-        boardChunkWid = canvasCfg.boardWidth,
-        boardChunkHei = canvasCfg.boardHeight,
-        cooldown = canvasCfg.cooldown;
+    // Быстрая палитра
+    bgrPalette = new Uint32Array(allColors.map(rgb => rgb2abgr(...rgb)));
+    hexPalette = allColors.map(rgb2hex);
+    boardChunkWid = canvasCfg.boardWidth;
+    boardChunkHei = canvasCfg.boardHeight;
+    cooldown = canvasCfg.cooldown;
 
-    Array.from(bgrPalette.values()).forEach((argb, i) => argbToId[argb] = i);
+    for (let i = 0; i < bgrPalette.length; i++) {
+        argbToId[bgrPalette[i]] = i;
+    }
 
     downloaded = true;
     toCall.forEach(f => f());
@@ -67,31 +70,25 @@ export async function download() {
 }
 
 let toCall = [];
-export function callOnLoad(cb){
-    if(downloaded) return cb();
-    toCall.push(cb);
+export function callOnLoad(cb) {
+    if (downloaded) cb();
+    else toCall.push(cb);
 }
 
-// the same as above but in the Promise format
-export async function resolveWhenConfigDownloaded() {
-    if (downloaded) {
-        return;
-    } else {
-        return new Promise(res => {
-            const int = setInterval(() => {
-                if (downloaded) {
-                    clearInterval(int);
-                    res();
-                }
-            }, 10);
-        })
-    }
+export function resolveWhenConfigDownloaded() {
+    if (downloaded) return Promise.resolve();
+    return new Promise(res => {
+        const int = setInterval(() => {
+            if (downloaded) {
+                clearInterval(int);
+                res();
+            }
+        }, 10);
+    });
 }
 
 export function showProtected(show = true) {
     game.showProtected = show;
-    globals.chunkManager.chunks.forEach(chunk => {
-        chunk.needRender = true;
-    });
+    globals.chunkManager.chunks.forEach(chunk => chunk.needRender = true);
     globals.renderer.needRender = true;
 }

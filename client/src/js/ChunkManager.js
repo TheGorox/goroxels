@@ -209,7 +209,6 @@ export default class ChunkManager {
             const cache = await caches.open(CHUNK_CACHE_NAME);
             const resp = await cache.match(`${canvasId}-${x}-${y}`);
             if (!resp) {
-                console.log('cache no match');
                 delete this.chunkHashes[`${x},${y}`];
                 this.saveChunkHashes();
 
@@ -236,6 +235,12 @@ export default class ChunkManager {
         }
 
         globals.renderer.needRender = true;
+    }
+
+    reRenderAll() {
+        for (const [_, chunk] of this.chunks) {
+            chunk.needRender = true;
+        }
     }
 
     loadChunk(x, y) {
@@ -327,5 +332,33 @@ export default class ChunkManager {
             ctx.drawImage(chunk.canvas, offX, offY)
         })
         return canvas
+    }
+
+
+    dumpZone(startX, startY, w, h) {
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+
+        const ctx = canvas.getContext('2d');
+
+        const startChunkX = Math.floor(startX / chunkSize),
+            startChunkY = Math.floor(startY / chunkSize),
+            endChunkX = Math.floor((startX + w) / chunkSize),
+            endChunkY = Math.floor((startY + h) / chunkSize);
+
+        for (let cx = startChunkX; cx <= endChunkX; cx++) {
+            for (let cy = startChunkY; cy <= endChunkY; cy++) {
+                const chunk = this.getChunk(cx, cy);
+                if (!chunk || !chunk.canvas) continue;
+
+                const offX = (chunk.x * chunkSize) - startX,
+                    offY = (chunk.y * chunkSize) - startY;
+
+                ctx.drawImage(chunk.canvas, offX, offY);
+            }
+        }
+
+        return canvas;
     }
 }

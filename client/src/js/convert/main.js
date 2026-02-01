@@ -4,31 +4,35 @@ import '../../img/folder.png';
 import '../../img/pattern.png';
 import '../../img/palette.png';
 import '../../img/palette2.png';
-import palettes, { loadGamePalettes } from './palettes';
 
 import './setImmediate';
 
-const clrManip = require('./color');
-const bayer = require('./bayerMatrices');
-const importedPatterns = require('./patterns');
-
+import palettes from './palettes';
 import converterWProm from './converterWASM';
-(async () => {
-    const module = await converterWProm
-    window.convModule = module;
-    window.clrManip = clrManip;
-})()
+import clrManip from './color';
+import * as importedPatterns from './patterns';
 
 import imgZoom from './imgzoom';
 import openImage from './openImage';
+import { isImagePixelArt, resizeCanvas } from './resize';
+import { linkNumberRangeInputs } from './dom';
 
 import { upload } from './imgur';
 
-import { init as initTranslates, translate as t } from '../translate'
+import { Ditherer } from './ditherer';
+import errorDiffMatrices from './matrices/errorDiffusion';
+
+import { init as initTranslates, translate as t } from '../translate';
 import { processApiErrors } from '../utils/api';
-import { isImagePixelArt, resizeCanvas } from './resize';
-import { linkNumberRangeInputs, watchInput } from './dom';
 import { sleep } from '../utils/misc';
+
+(async () => {
+    const module = await converterWProm;
+    window.convModule = module;
+    window.clrManip = clrManip;
+})();
+
+
 initTranslates();
 
 let resizeKeepAspectRatio = true;
@@ -65,16 +69,27 @@ let utils = {
 }
 
 const paletteSel = $('#paletteSel');
-function applyPalettes(selected = 'pixelplanet') {
+function applyPalettes(selected) {
+    let paletteSelected = false;
     Object.keys(palettes).forEach(key => {
         const newEl = $(`<option id="p_${key}">${key}</option>`);
         newEl.val(key);
 
-        if (key === selected)
+        if (key === selected) {
+            paletteSelected = true;
             newEl.attr('selected', '');
+            palUtils.setPalette(palettes[key]);
+        }
+
 
         paletteSel.prepend(newEl);
     });
+
+    // in case some palette was deleted
+    if (!paletteSelected) {
+        $('#p_goroxels1').attr('selected', '');
+        palUtils.setPalette(palettes['goroxels1']);
+    }
     paletteSel.append('<option value="_custom">custom</option>');
 }
 
@@ -88,6 +103,7 @@ paletteSel.on('change', () => {
 
         const pal = palettes[val];
 
+        localStorage.setItem('converterPalette', val);
         palUtils.setPalette(pal);
         palUtils.updatePalette();
 
@@ -149,30 +165,36 @@ function tryParseUserPalette() {
     $('#userPalette').css('background-color', '')
 }
 
-let paletteRGB = palettes['game.main'],
+let paletteRGB,
     paletteLAB,
     paletteOKLab,
     palette32;
 
 let palUtils = {
-    link: null,
+    // all the dithering happens in thing below (ditherer.js)
+    ditherer: null,
+    
+    colorValuesExRGB: [],
+    colorValuesExLab: [],
+    colorValuesExOkLab: [],
+
     converterInterval: null,
     usedColors: [],
-    rgb2lab: clrManip.rgb2lab,
-    rgb2uint32: clrManip.rgb2uint32,
+
     setPalette(palette) {
-        paletteRGB = palette
+        paletteRGB = palette;
+        this.ditherer?.setPalette(palette);
+        this.updatePalette();
     },
     updatePalette() {
-        paletteLAB = paletteRGB.map(this.rgb2lab);
+        paletteLAB = paletteRGB.map(clrManip.rgb2lab);
         paletteOKLab = paletteRGB.map(clrManip.rgb2okLAB);
-        palette32 = paletteRGB.map(this.rgb2uint32);
-
+        palette32 = paletteRGB.map(clrManip.rgb2uint32);
 
         this.ditherPalette();
     },
     ditherPalette() {
-        if($('#ditheringMode').val() !== 'check') return;
+        if ($('#ditheringMode').val() !== 'check') return;
 
         // спи.. взято на вооружение!
         this.colorValuesExRGB = [];
@@ -205,314 +227,18 @@ let palUtils = {
             });
         });
         this.colorValuesExRGB.forEach((val, idx) => {
-            if(isOklab){
+            if (isOklab) {
                 this.colorValuesExOkLab[idx] = clrManip.rgb2okLAB(val.map(x => x | 0));
-                
+
                 this.colorValuesExOkLab[idx][3] = val[3];
                 this.colorValuesExOkLab[idx][4] = val[4];
 
-            }else{
+            } else {
                 this.colorValuesExLab[idx] = clrManip.rgb2lab(val);
                 this.colorValuesExLab[idx][3] = val[3];
                 this.colorValuesExLab[idx][4] = val[4];
             }
         });
-        console.log(this.colorValuesExRGB.length);
-    },
-    ditherTypes: {
-        //      X   7
-        //  3   5   1
-        floydSteinberg: [
-            [7 / 16, 1, 0],
-            [3 / 16, -1, 1],
-            [5 / 16, 0, 1],
-            [1 / 16, 1, 1]
-        ],
-        //          X   8   4 
-        //  2   4   8   4   2
-        //  1   2   4   2   1
-        stuki: [
-            [8 / 42, 1, 0],
-            [4 / 42, 2, 0],
-            [2 / 42, -2, 1],
-            [4 / 42, -1, 1],
-            [8 / 42, 0, 1],
-            [4 / 42, 1, 1],
-            [2 / 42, 2, 1],
-            [1 / 42, -2, 2],
-            [2 / 42, -1, 2],
-            [4 / 42, 0, 2],
-            [2 / 42, 1, 2],
-            [1 / 42, 2, 2],
-        ],
-        //          X   4   3
-        //  1   2   3   2   1
-        sierraTwo: [
-            [4 / 16, 1, 0],
-            [3 / 16, 2, 0],
-            [1 / 16, -2, 1],
-            [2 / 16, -1, 1],
-            [3 / 16, 0, 1],
-            [2 / 16, 1, 1],
-            [1 / 16, 2, 1],
-        ],
-    },
-    /**
-     * 
-     * @param {ImageData} imageData 
-     * @param {String} dithering 
-     */
-    * errorDithering(imageData, dithering) {
-        const width = imageData.width;
-        const height = imageData.height;
-
-        const serp = $('#serp')[0].checked;
-        let imgData = imageData.data;
-
-        let deFunction;
-        let palette = paletteRGB;
-
-        const buf32 = new Uint32Array(imgData.buffer);
-
-        switch ($('#colorfunc').val()) {
-            case 'lwrgbde':
-                deFunction = clrManip.lwrgbde;
-                break
-            case 'ciede1994':
-                deFunction = clrManip.mciede1994mix;
-                palette = paletteLAB;
-                break
-            case 'ciede2000':
-                deFunction = clrManip.mciede2000mix;
-                palette = paletteLAB;
-                break
-            case 'cmcic':
-                deFunction = clrManip.cmcicMix;
-                palette = paletteLAB;
-                break
-            case 'eucl':
-                deFunction = clrManip.euclidian;
-                break
-            case 'oklab':
-                deFunction = clrManip.mOklabDiffMix;
-                palette = paletteOKLab;
-                break
-        }
-
-        let cntr = 0;
-        let dir = 1;
-
-        for (let y = 0; y < height; y++) {
-            for (let x = (dir > 0 ? 0 : width - 1), max = (dir > 0 ? width : 0); x !== max; x += dir) {
-                const i = x + y * width;
-
-                const col32 = buf32[i];
-
-                if (col32 >> 24 !== 0) {
-                    const color = clrManip.uint32toRGB(col32);
-                    const rgb = col32 & 0xffffff;
-                    // console.log(col32, color, buf32)
-
-                    let matchIndex = -1;
-                    const usedIndex = this.usedColors[rgb];
-                    if (usedIndex !== undefined) {
-                        matchIndex = usedIndex;
-                    } else {
-                        matchIndex = clrManip.mapcolor(color, palette, deFunction);
-                        this.usedColors[rgb] = matchIndex;
-                    }
-                    const matchingColor32 = palette32[matchIndex],
-                        matchingColor = paletteRGB[matchIndex];
-
-                    buf32[i] = matchingColor32;
-
-                    if (dithering) {
-                        const distR = color[0] - matchingColor[0],
-                            distG = color[1] - matchingColor[1],
-                            distB = color[2] - matchingColor[2];
-
-                        for (let j = (~dir ? 0 : dithering.length - 1), end = (~dir ? dithering.length : 0); j != end; j += dir) {
-                            const p = dithering[j];
-
-                            const [mult, X, Y] = [p[0], x + p[1] * dir, y + p[2]];
-                            if (X < 0 || X >= width || Y < 0 || Y >= height)
-                                continue;
-
-                            const i = X + Y * width;
-                            let rgb = clrManip.uint32toRGB(buf32[i]);
-
-                            const I = i * 4;
-
-                            imgData[I] = Math.max(0, Math.min(255, rgb[0] + distR * mult));
-                            imgData[I + 1] = Math.max(0, Math.min(255, rgb[1] + distG * mult));
-                            imgData[I + 2] = Math.max(0, Math.min(255, rgb[2] + distB * mult));
-                        }
-                    }
-                } else {
-                    buf32[i] = 0;
-                }
-
-                if (cntr++ % 2000 === 0) {
-                    yield cntr / buf32.length;
-                }
-            }
-
-
-            if (serp)
-                dir *= -1;
-        }
-
-        return imageData;
-    },
-    * checkboardDithering(imageData) { // дупликация кода конечно, но мне пофег
-        const width = imageData.width;
-        let imgData = imageData.data;
-
-        let deFunction;
-        let palette = this.colorValuesExRGB;
-        switch ($('#colorfunc').val()) {
-            case 'lwrgbde':
-                deFunction = clrManip.lwrgbde;
-                break
-            case 'ciede2000':
-                deFunction = clrManip.mciede2000mix;
-                palette = this.colorValuesExLab;
-                break
-            case 'cmcic':
-                deFunction = clrManip.cmcicMix;
-                palette = this.colorValuesExLab;
-                break
-            case 'eucl':
-                deFunction = clrManip.euclidian;
-                break
-            case 'oklab':
-                deFunction = clrManip.mOklabDiffMix;
-                palette = this.colorValuesExOkLab;
-                break
-        }
-
-        const rowSize = width * 4;
-        // палитра со смешанными цветами
-        // в зависимости от расположения, цвет будет чередоваться
-        let cntr = 0;
-        for (let i = imgData.length - 1; i >= 0; i -= 4) {
-            if (imgData[i] > 127) {
-                let color = [imgData[i - 3], imgData[i - 2], imgData[i - 1]];
-                const colorEnc = (color[0] << 16) + (color[1] << 8) + color[2];
-                let matchIndex = -1;
-                const usedIndex = this.usedColors[colorEnc];
-                if (usedIndex !== undefined) {
-                    matchIndex = usedIndex;
-                } else {
-                    matchIndex = clrManip.mapcolor(color, palette, deFunction);
-                    this.usedColors[colorEnc] = matchIndex;
-                }
-                const matchingColor1 = this.colorValuesExRGB[matchIndex][3];
-                const matchingColor2 = this.colorValuesExRGB[matchIndex][4];
-
-                // x + y % 2
-                if (((i - 3) % rowSize / 4 + Math.floor(i / rowSize)) % 2 === 0) {
-                    matchIndex = matchingColor1;
-                } else {
-                    matchIndex = matchingColor2;
-                }
-
-                const matchingColor = paletteRGB[matchIndex];
-
-                imgData[i] = 255;
-                imgData[i - 3] = matchingColor[0];
-                imgData[i - 2] = matchingColor[1];
-                imgData[i - 1] = matchingColor[2];
-            } else {
-                imgData[i - 3] = 0;
-                imgData[i - 2] = 0;
-                imgData[i - 1] = 0;
-                imgData[i] = 0;
-            }
-
-            if (cntr++ % 2000 === 0) {
-                yield cntr / (imgData.length / 4);
-            }
-        }
-        return imageData;
-    },
-    * orderedDithering(imageData, matrixSize, custom = false, mode = 1) {
-        const M = bayer[custom ? ('c' + matrixSize) : matrixSize];
-
-        // matrix maximum value
-        const max = M.length ** 2;
-
-        const width = imageData.width;
-        let imgData = imageData.data;
-
-        let deFunction;
-        let palette = paletteRGB;
-        switch ($('#colorfunc').val()) {
-            case 'lwrgbde':
-                deFunction = clrManip.lwrgbde;
-                break
-            case 'ciede2000':
-                deFunction = clrManip.mciede2000mix;
-                palette = paletteLAB;
-                break
-            case 'cmcic':
-                deFunction = clrManip.cmcicMix;
-                palette = paletteLAB;
-                break
-            case 'eucl':
-                deFunction = clrManip.euclidian;
-                break
-            case 'oklab':
-                deFunction = clrManip.mOklabDiffMix;
-                palette = paletteOKLab;
-                break
-        }
-
-        let cntr = 0;
-        for (let i = 0; i < imgData.length; i += 4) {
-            if (imgData[i + 3] > 127) {
-                let origOffset = i / 4;
-                let x = origOffset % width;
-                let y = origOffset / width | 0; // отбрасывает числа после запятой
-                let matrixThres = M[x % matrixSize][y % matrixSize];
-                if (mode === 0) {
-                    matrixThres = -matrixThres;
-                } else if (mode == 2) {
-                    matrixThres -= max / 2;
-                }
-
-                for (let j = 0; j < 3; j++) {
-                    imgData[i + j] += matrixThres;
-                } // цикл по rgb
-
-                let color = [imgData[i], imgData[i + 1], imgData[i + 2]];
-
-                const colorEnc = (color[0] << 16) + (color[1] << 8) + color[2];
-                let matchIndex = -1;
-                const usedIndex = this.usedColors[colorEnc];
-                if (usedIndex !== undefined) {
-                    matchIndex = usedIndex;
-                } else {
-                    matchIndex = clrManip.mapcolor(color, palette, deFunction);
-                    //toastr.info(error);
-                    this.usedColors[colorEnc] = matchIndex;
-                }
-                const matchingColor = paletteRGB[matchIndex];
-                imgData[i] = matchingColor[0];
-                imgData[i + 1] = matchingColor[1];
-                imgData[i + 2] = matchingColor[2];
-                imgData[i + 3] = 255;
-            } else {
-                imgData[i] = 0;
-                imgData[i + 1] = 0;
-                imgData[i + 2] = 0;
-                imgData[i + 3] = 0;
-            }
-            if (cntr++ % 2000 === 0) {
-                yield cntr / (imgData.length / 4);
-            }
-        }
-        return imageData;
     }
 }
 
@@ -610,7 +336,6 @@ function converterPreload(showWarn = true) {
         }
 
         if (utils.isURLValid(path)) {
-            palUtils.link = path;
             startPaletteConverter(path);
         } else {
             return showWarn && toastr.error(t('Invalid link!'));
@@ -660,6 +385,10 @@ function startPaletteConverter(url) {
                     resizeWidth = canvas.width / pixelSize;
                     resizeHeight = canvas.height / pixelSize;
                     withAA = false;
+
+                    // update inputs to reflect new sizes
+                    $('#resizeXInput,#resizeXRange').val(resizeWidth);
+                    $('#resizeYInput,#resizeYRange').val(resizeHeight);
                 }
             }
 
@@ -699,48 +428,48 @@ function startPaletteConverter(url) {
 
         palUtils.updatePalette();
 
+        const ditherer = palUtils.ditherer;
+        ditherer.usedColors.clear();
+
         let convGen; // converterGenerator
         switch ($('#ditheringMode').val()) {
             case 'none':
-                convGen = palUtils.errorDithering(imgData);
+                convGen = ditherer.errorDiffusion(imgData);
                 break;
             case 'f-s':
-                convGen = palUtils.errorDithering(imgData, palUtils.ditherTypes.floydSteinberg);
-                //convGen = palUtils.floydSteinberg(imgData, palUtils.ditherTypes.floydSteinberg);
+                convGen = ditherer.errorDiffusion(imgData, errorDiffMatrices.floydSteinberg);
                 break;
             case 'stuki':
-                convGen = palUtils.errorDithering(imgData, palUtils.ditherTypes.stuki);
-                break;
-            case 'check':
-                convGen = palUtils.checkboardDithering(imgData);
+                convGen = ditherer.errorDiffusion(imgData, errorDiffMatrices.stuki);
                 break;
             case 'sierra':
-                convGen = palUtils.errorDithering(imgData, palUtils.ditherTypes.sierraTwo);
+                convGen = ditherer.errorDiffusion(imgData, errorDiffMatrices.sierraTwo);
                 break;
-            case 'sierra-lite':
-                convGen = palUtils.errorDithering(imgData, palUtils.ditherTypes.sierraLite);
+            case 'check':
+                convGen = ditherer.checkboardDithering(imgData, palUtils);
                 break;
             case 'ordered':
-                var matrix = $('#ordMatrixSelect').val();
-                var mode = $('#ordMatrixModeSelect').val();
+                let matrix = $('#ordMatrixSelect').val();
+                let mode = $('#ordMatrixModeSelect').val();
 
                 if (mode == 'des') mode = 0;
                 else if (mode == 'asc') mode = 1;
                 else mode = 2;
 
-                var custom = false;
+                let custom = false;
                 if (matrix.startsWith('c')) {
                     custom = true;
                     matrix = matrix.slice(1);
                 }
-                convGen = palUtils.orderedDithering(imgData, +matrix, custom, mode);
+
+                const bayerStrength = +$('#bayerAdj').val();
+                convGen = ditherer.orderedDithering(imgData, +matrix, custom, mode, bayerStrength);
                 break;
             default:
                 toastr.warning('O_o');
                 return;
         }
 
-        palUtils.usedColors = [];
 
         let startTime = Date.now();
         const progressBar = $('#palLB>.barProgress');
@@ -754,7 +483,7 @@ function startPaletteConverter(url) {
                 ctx.putImageData(imgData, 0, 0);
                 onDone(canvas, 'palOut',
                     () => {
-                        toastr.info(`${t('Done in')} ${(Date.now() - startTime) / 1000}${t('s.')}`);
+                        toastr.success(`${t('Done in')} ${(Date.now() - startTime) / 1000}${t('s.')}`);
                     });
             } else {
                 let perc = loaded.value * 100;
@@ -785,10 +514,16 @@ $('#resetContrast').on('click', () => {
 $('#brightAdj').on('input', (e) => {
     $('#brightAdjLabel').text(e.target.value);
 });
-$('#resetBrightness').click(() => {
+$('#resetBrightness').on('click', () => {
     $('#brightAdj').val(0);
     $('#brightAdjLabel').text(0);
 });
+
+$('#bayerAdj').on('input', (e) => {
+    $('#bayerAdjLabel').text(e.target.value);
+});
+$('#bayerAdj').trigger('input');
+
 document.onkeydown = e => {
     if (e.key === 'Enter' && !e.repeat) {
         converterPreload();
@@ -809,13 +544,14 @@ let patUtils = {
     usedColors: [],
 
     patternsCans: [], // список картинок с паттернами для ускоренного рисования
-    generatePatterns() {
+    async generatePatterns() {
         this.patternsCans = [];
         const patternSize = this.patternSize;
         let pattern, ctx, color;
         for (let i = 0; i < paletteRGB.length; i++) {
             let canvas = document.createElement('canvas');
             canvas.width = canvas.height = patternSize;
+
 
             pattern = this.patterns[i % this.patterns.length];
             color = paletteRGB[i];
@@ -833,7 +569,7 @@ let patUtils = {
                 ctx.fillRect(x, y, 1, 1);
             }
 
-            this.patternsCans.push(canvas);
+            this.patternsCans.push(await createImageBitmap(canvas));
         }
     },
     drawPattern(ctx, pattern, startX, startY, color) {
@@ -847,63 +583,132 @@ let patUtils = {
         }
     },
     // todo расширяемые паттерны
-    * patternize(canvas) {
+    async * patternize(canvas) {
         const ctx = canvas.getContext('2d');
         const {
             data: imgData,
             width, height
         } = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-        this.generatePatterns();
+
+        await this.generatePatterns();
+
 
         const patternSize = this.patternSize;
-        const patternLength = patternSize ** 2;
 
         const newWidth = width * patternSize;
         const newHeight = height * patternSize;
 
-        let newCanvas = document.createElement('canvas');
-        newCanvas.width = newWidth;
-        newCanvas.height = newHeight;
-
-        const ctx2 = newCanvas.getContext('2d');
 
         // actual palette32 includes opacity, i don't need it
         let palette32 = paletteRGB.map(c => (c[0] << 16) + (c[1] << 8) + c[2])
         let colorMap = new Map();
         palette32.forEach((el, i) => colorMap.set(el, i))
 
-        let imgX, imgY, absX, absY, color, colId, color32, _i, pattern;
-        for (let i = 0; i < imgData.length; i += 4) {
-            if (imgData[i + 3] < 127) continue;
+        let color, colId, color32, pattern;
 
-            _i = i / 4;
-            imgX = _i % width;
-            imgY = _i / width | 0;
+        const CHUNK_SIZE = 500;
+        const CHUNKS_X = Math.ceil(width / CHUNK_SIZE);
+        const CHUNKS_Y = Math.ceil(height / CHUNK_SIZE);
 
-            absX = imgX * patternSize;
-            absY = imgY * patternSize;
 
-            color = [imgData[i], imgData[i + 1], imgData[i + 2], imgData[i + 3]];
-            color32 = (color[0] << 16) + (color[1] << 8) + color[2];
+        const chunks = [];
 
-            colId = colorMap.get(color32);
+        let counter = 0;
+        for (let cx = 0; cx < CHUNKS_X; cx++) {
+            for (let cy = 0; cy < CHUNKS_Y; cy++) {
+                const startX = cx * CHUNK_SIZE;
+                const startY = cy * CHUNK_SIZE;
+                const endX = Math.min((cx + 1) * CHUNK_SIZE, width);
+                const endY = Math.min((cy + 1) * CHUNK_SIZE, height);
 
-            pattern = this.patternsCans[colId];
+                const chunkCanvas = document.createElement('canvas');
+                chunkCanvas.width = (endX - startX) * patternSize;
+                chunkCanvas.height = (endY - startY) * patternSize;
 
-            if (pattern) {
-                ctx2.drawImage(pattern, absX, absY);
-            } else {
-                this.drawPattern(ctx2, this.defaultPattern, absX, absY, color)
-            }
+                const chunkCtx = chunkCanvas.getContext('2d');
 
-            if (i % 8000 === 0) {
-                yield i / imgData.length
+
+                for (let x = startX; x < endX; x++) {
+                    for (let y = startY; y < endY; y++) {
+                        counter++;
+
+                        const i = (x + y * width) * 4;
+
+                        color = [imgData[i], imgData[i + 1], imgData[i + 2], imgData[i + 3]];
+                        if (color[3] !== 255) continue;
+
+                        color32 = (color[0] << 16) + (color[1] << 8) + color[2];
+
+                        colId = colorMap.get(color32);
+
+                        pattern = this.patternsCans[colId];
+
+                        const localX = (x - startX) * patternSize;
+                        const localY = (y - startY) * patternSize;
+                        if (pattern) {
+                            chunkCtx.drawImage(pattern, localX, localY);
+                        } else {
+                            this.drawPattern(chunkCtx, this.defaultPattern, localX, localY, color);
+                        }
+
+                        if (i % 3000 === 0) {
+                            yield counter / (imgData.length / 4)
+                        }
+                    }
+                }
+
+                chunks.push([
+                    cx, cy, chunkCanvas
+                ]);
             }
         }
+
+        let compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = newWidth;
+        compositeCanvas.height = newHeight;
+
+        const compCtx = compositeCanvas.getContext('2d');
+        for (const chunk of chunks) {
+            const [cx, cy, chunkCanvas] = chunk;
+            const offX = cx * CHUNK_SIZE * patternSize;
+            const offY = cy * CHUNK_SIZE * patternSize;
+
+            compCtx.drawImage(chunkCanvas, offX, offY);
+        }
+
+
+        // for (let i = 0; i < imgData.length; i += 4) {
+        //     if (imgData[i + 3] < 127) continue;
+
+        //     _i = i / 4;
+        //     imgX = _i % width;
+        //     imgY = _i / width | 0;
+
+        //     absX = imgX * patternSize;
+        //     absY = imgY * patternSize;
+
+        //     color = [imgData[i], imgData[i + 1], imgData[i + 2], imgData[i + 3]];
+        //     color32 = (color[0] << 16) + (color[1] << 8) + color[2];
+
+        //     colId = colorMap.get(color32);
+
+        //     pattern = this.patternsCans[colId];
+
+        //     if (pattern) {
+        //         ctx2.drawImage(pattern, absX, absY);
+        //     } else {
+        //         this.drawPattern(ctx2, this.defaultPattern, absX, absY, color)
+        //     }
+
+        //     console.log('cyc');
+        //     if (i % 2000 === 0) {
+        //         yield i / imgData.length
+        //     }
+        // }
         //newCanvas.getContext('2d').putImageData(newImgData, 0, 0);
 
-        return newCanvas;
+        return compositeCanvas;
     }
 }
 
@@ -970,7 +775,6 @@ function patternPreload() {
         }
 
         if (utils.isURLValid(path) && utils.isURLImage(path)) {
-            palUtils.link = path;
             patternatorStart(path);
         } else {
             return toastr.error(t('Invalid link!'));
@@ -1008,17 +812,31 @@ function patternatorStart(url) {
         toastr.warning(t('If your image is big, go make a tea and watch Doctor Who'));
         let convGen = patUtils.patternize(canvas);
 
+
+
+        let toast = toastr.info(`(0%)`, "PATTERN", {
+            timeOut: 0,
+            extendedTimeOut: 0,
+            closeButton: true,
+            tapToDismiss: false
+        });
+
         let startTime = Date.now();
-        patUtils.converterInterval = setImmediate(function rec() {
-            let loaded = convGen.next();
+        patUtils.converterInterval = setTimeout(async function rec() {
+            let loaded = await convGen.next();
+
+            if (toast && toast.find('.toast-message').length) {
+                toast.find('.toast-message').text(`${(loaded.value * 100) | 0}%`);
+            }
 
             if (loaded.done) {
+                toast.remove();
                 onDone(loaded.value, 'patOut',
                     () => {
-                        toastr.info(`${t('Done in')} ${(Date.now() - startTime) / 1000}s.`);
+                        toastr.success(`${t('Done in')} ${(Date.now() - startTime) / 1000}s.`);
                     });
             } else {
-                patUtils.converterInterval = setImmediate(rec);
+                patUtils.converterInterval = setTimeout(rec);
             }
         });
     }
@@ -1110,7 +928,9 @@ async function showUploadPrompt(palettizedCanvas) {
             prompt.append(thumbImg, namesContainer, patternContainer, publicContainer, confirmButton);
             $('body').append(prompt);
 
-            async function onclick() {
+            async function onConfirmClick() {
+                confirmButton.prop('disabled', true);
+
                 const templateName = nameInput.val().trim();
                 if (templateName.length < 3 || templateName.length > 32) {
                     toastr.error(t('template_name_shit'));
@@ -1141,7 +961,7 @@ async function showUploadPrompt(palettizedCanvas) {
 
                         const patternGen = patUtils.patternize(palettizedCanvas);
                         let patternResult;
-                        while (!(patternResult = patternGen.next()).done) {
+                        while (!(patternResult = await patternGen.next()).done) {
                             await sleep(0);
                             if (toast && toast.find('.toast-message').length) {
                                 toast.find('.toast-message').text(`${(patternResult.value * 100) | 0}%`);
@@ -1158,8 +978,11 @@ async function showUploadPrompt(palettizedCanvas) {
                     formData.append('pattern', patternBlob, 'pattern.png');
 
                     const isPublic = publicCheckbox.is(':checked');
-                    const origWidth = patternized ? palettizedCanvas.width : '';
-                    const url = `/api/template/add?name=${encodeURIComponent(templateName)}&public=${isPublic}&width=${origWidth}`;
+
+                    let url = `/api/template/add?name=${encodeURIComponent(templateName)}&public=${isPublic}`;
+                    if (patternized) {
+                        url += `&width=${palettizedCanvas.width}`;
+                    }
 
                     const response = await fetch(url, {
                         method: 'POST',
@@ -1180,12 +1003,14 @@ async function showUploadPrompt(palettizedCanvas) {
                     res(result);
 
                 } catch (error) {
+                    confirmButton.removeAttr('disabled');
+
                     toastr.error('Upload failed: ' + error.message);
                     rej(error);
                 }
             }
 
-            confirmButton.on('click', onclick);
+            confirmButton.on('click', onConfirmClick);
 
             fetch(`/api/template/list?self=1`, {
                 credentials: 'include'
@@ -1193,13 +1018,18 @@ async function showUploadPrompt(palettizedCanvas) {
                 const result = await response.json();
 
                 if (result.errors) {
+                    if (result.errors[0] === 'Not permitted') {
+                        toastr.warning(t('you_need_login_to_use_this_feature'));
+                        prompt.remove();
+                        return;
+                    }
                     processApiErrors(result.errors);
                     return;
                 }
 
                 const templates = result;
 
-                for(const template of templates){
+                for (const template of templates) {
                     const option = $(`<option value="${template.name}">${template.name}</option>`);
                     namesSelect.append(option);
                 }
@@ -1301,6 +1131,8 @@ function onDone(canvas, convClass, callback) {
 
     if (convClass === 'palOut') {
         $(`#${convClass} .uploadGrokselsButton`).one('click', () => {
+            $(`#${convClass} .uploadGrokselsButton`).prop('disabled', true);
+
             showUploadPrompt(canvas).then(template => {
                 if (template === null || template === undefined) {
                     return;
@@ -1352,18 +1184,18 @@ $('#resizeYInput,#resizeYRange').on('input', e => {
     $('#resizeXInput,#resizeXRange').val(newWidth);
 });
 
-
-
-let palName;
-loadGamePalettes().then(() => {
-    palName = 'game.main'
-}).catch(() => {
-    toastr.error(t('Failed to load game palettes!'));
-    palName = 'pixelplanet'
-}).finally(() => {
-    applyPalettes(palName);
-    paletteRGB = palettes[palName];
-
-    palUtils.updatePalette();
-    visualizePalette();
+$('#colorfunc').on('change', () => {
+    palUtils.ditherer.setColorFunc($('#colorfunc').val());
+    palUtils.ditherPalette();
+    converterPreload(false);
 });
+
+
+
+let palName = localStorage.getItem('converterPalette') ?? 'goroxels1';
+applyPalettes(palName);
+
+// palUtils
+palUtils.updatePalette();
+visualizePalette();
+palUtils.ditherer = new Ditherer(paletteRGB, $('#colorfunc').val());

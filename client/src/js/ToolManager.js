@@ -211,9 +211,9 @@ export default class ToolManager extends EventEmitter {
             });
             em.on('mousemove', e => {
                 updatePlayerCoords(e.clientX, e.clientY);
-
-                this.tool.emit('move', e)
+                this.tool.emit('move', e);
                 this.emit('move', e);
+                
             });
 
             const keydown = (e) => {
@@ -279,8 +279,8 @@ export default class ToolManager extends EventEmitter {
                 const dx = e.clientX - window.innerWidth / 2;
                 const dy = e.clientY - window.innerHeight / 2;
 
-                camera.moveTo((dx / oldZoom), (dy / oldZoom));
-                camera.moveTo(-(dx / camera.zoom), -(dy / camera.zoom));
+                camera.moveBy((dx / oldZoom), (dy / oldZoom));
+                camera.moveBy(-(dx / camera.zoom), -(dy / camera.zoom));
 
                 if (localStorage.getItem('iHaveProblems') === 'yes') {
                     camera.x = Math.round(camera.x); camera.y = Math.round(camera.y);

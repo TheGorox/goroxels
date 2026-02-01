@@ -1,4 +1,4 @@
-import { palette } from "../config";
+import { allColors, currentPalette, currentPaletteColors } from "../config";
 
 export function rgb2abgr(r, g, b) {
     return 0xff000000 | b << 16 | g << 8 | r;
@@ -27,11 +27,11 @@ export function applyColor(origColor, tintColor) {
     ];
 }
 
-export function closestColor(rgb, palette){
+export function closestColor(rgb, palette) {
     let colorId = -1;
     let score = 768; // 255 + 255 + 255
 
-    for(let i = 0; i < palette.length; i++){
+    for (let i = 0; i < palette.length; i++) {
         const item = palette[i];
 
         let scrnow = Math.abs(rgb[0] - item[0]) + Math.abs(rgb[1] - item[1]) + Math.abs(rgb[2] - item[2]);
@@ -40,18 +40,28 @@ export function closestColor(rgb, palette){
             colorId = i;
         }
 
-        if(scrnow == 0) break;
+        if (scrnow == 0) break;
     }
     return colorId;
 }
 
-export function getPaletteColorId(color){
-    return palette.findIndex(palCol => {
-        return palCol[0] === color[0] && palCol[1] === color[1] && palCol[2] === color[2];
-    });
+export function getPaletteColorId(color) {
+    // if we're using one of multiple palettes, 
+    // try to find the color in this palette first
+    if(currentPalette){
+        const startIdx = currentPalette.slice[0];
+        
+        const colIdx = currentPaletteColors.findIndex(palCol => eq(palCol, color));
+        if(colIdx !== -1) return startIdx + colIdx;
+    }
+    return allColors.findIndex(palCol => eq(palCol, color));
 }
 
-export function isDarkColor(r, g, b){
-    const darkness = 1-(0.299*r + 0.587*g + 0.114*b)/255;
+export function isDarkColor(r, g, b) {
+    const darkness = 1 - (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return darkness > 0.5;
+}
+
+export function eq(col1, col2) {
+    return col1[0] === col2[0] && col1[1] === col2[1] && col1[2] === col2[2];
 }

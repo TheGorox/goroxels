@@ -25,11 +25,13 @@ const namePathEntries = requireOldWipe.keys().map(key => {
 export const wipes = Object.fromEntries(namePathEntries);
 
 let historyFx = null, fxCtx = null, prevCameraState;
+export let curHistoryCanvasUrl = null;
 export async function showHistoryCanvas(name) {
     unloadHistoryCanvas();
 
 
-    const canvasImg = await loadHistoryCanvas(wipes[name]);
+    curHistoryCanvasUrl = wipes[name]
+    const canvasImg = await loadHistoryCanvas(curHistoryCanvasUrl);
 
     // saving and changing camera borders
     // (the thing that helps you not get lost when moving canvas)
@@ -88,6 +90,8 @@ function cloneCameraProps(){
 }
 
 export function unloadHistoryCanvas() {
+    curHistoryCanvasUrl = null;
+
     globals.fxRenderer.remove(historyFx);
     if (fxCtx) {
         fxCtx.canvas.style.backgroundColor = '';

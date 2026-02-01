@@ -1,7 +1,6 @@
 import {
     boardWidth,
     boardHeight,
-    canvasName,
 } from '../config';
 import globals from '../globals';
 import { topMenuContent } from '../ui/elements';
@@ -215,15 +214,6 @@ export function reverseFade(el) {
     document.body.appendChild(fadeCanvas);
 
     return clear;
-}
-
-export function makeScreenshot() {
-    const canvas = globals.chunkManager.dumpAll();
-
-    const link = document.createElement('a');
-    link.download = `GX ${canvasName} ${getPathsafeDate()}.png`;
-    link.href = canvas.toDataURL()
-    link.click();
 }
 
 export async function sleep(ms) {

@@ -129,16 +129,15 @@ export function placePixels(pixels, store = true, isCtrlZ = false) {
     // does not check pixels, excluding for wand
 
     // check to allow place only on selected color, if selected
+    let outPixels = [];
     if (!isCtrlZ && globals.wandSelectedColor !== null) {
         const allowedCol = globals.wandSelectedColor;
 
         let someValid = false;
         for (let i = 0; i < pixels.length; i++) {
             const boardCol = globals.chunkManager.getChunkPixel(...pixels[i]);
-            if (boardCol !== allowedCol) {
-                // making pixels invalid
-                pixels[i][2] = 127;
-            } else {
+            if (boardCol === allowedCol) {
+                outPixels.push(pixels[i]);
                 someValid = true;
             }
         }
@@ -146,15 +145,16 @@ export function placePixels(pixels, store = true, isCtrlZ = false) {
         if (!someValid) return;
 
         globals.fxRenderer.needRender = true;
+    }else{
+        outPixels = pixels;
     }
 
     if (store) {
-        pixels.forEach(([x, y, c]) => {
-            if(c === 127) return;
+        outPixels.forEach(([x, y, c]) => {
             player.placed.push([x, y, globals.chunkManager.getChunkPixel(x, y)]);
         })
     }
-    globals.socket.sendPixels(pixels, false);
+    globals.socket.sendPixels(outPixels, false);
 }
 
 export function placePixel(x, y, col, store = true, isCtrlZ = false) {

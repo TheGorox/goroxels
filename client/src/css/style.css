@@ -1,5 +1,11 @@
-/* Убираем спиннеры, которые мешают нормально центрировать текст */
+@font-face {
+  font-family: 'Russo One';
+  font-style: normal;
+  font-weight: 400;
+  src: url(../font/RussoOne-Regular.ttf);
+}
 
+/* Убираем спиннеры, которые мешают нормально центрировать текст */
 input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
@@ -278,7 +284,7 @@ body, html {
     right: 0;
     overflow: hidden;
     touch-action: none;
-    font-family: "Russo One", sans-serif
+    font-family: sans-serif
 }
 
 body {
@@ -872,6 +878,11 @@ input[type=range]::-moz-range-thumb {
     word-break: break-word;
 }
 
+.messageTime {
+    color: #aaa;
+    font-size: 11px;
+}
+
 .messageText {
     font-weight: normal;
 }
@@ -954,6 +965,7 @@ input {
 
 .cordgo {
     cursor: pointer;
+    font-weight: bold;
 }
 
 /* placed pixels bubble */
@@ -1508,4 +1520,34 @@ textarea {
 /* it's in mini window so we can't take so much space */
 .bannedUntilNum {
     width: 60px;
+}
+
+.paletteCards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+}
+
+.paletteCard {
+    border-radius: 5px;
+    background-color: #404040;
+    /* width: 200px; */
+    padding: 10px;
+}
+
+.paletteCard:hover {
+    background-color: #444;
+}
+.paletteTitle {
+    font-size: 19px;
+    font-weight: bold;
+    text-align: center;
+}
+.palettePreview {
+    text-align: center;
+}
+.palettePreview > img {
+    width: 100%;
+
+    image-rendering: pixelated;
 }

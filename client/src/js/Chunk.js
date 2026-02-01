@@ -61,6 +61,7 @@ export default class Chunk {
         this.fromBuffer(buffer);
     }
 
+
     render() {
         if (this.needRender) {
             this.needRender = false;
@@ -109,7 +110,6 @@ export default class Chunk {
 
         this.needRender = true;
     }
-
     setProtect(x, y, state) {
         const i = x + y * chunkSize;
         this.pView[i] = state ? 0xFFFF0000 : 0;

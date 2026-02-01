@@ -63,7 +63,7 @@ const defaultVertexShader = `
         varying vec2 v_texCoord;
         void main() {
             v_texCoord = (a_position + 1.0) * 0.5;
-            // for some reason Y is inverted by default
+            // y is inverted
             v_texCoord.y = 1.0 - v_texCoord.y;
             gl_Position = vec4(a_position, 0.0, 1.0);
         }
@@ -80,3 +80,9 @@ export function generateShader(canvas, fragmentShader, needCreateTexture=true) {
 
     return { gl, program, texture };
 }
+
+const testCanvas = document.createElement('canvas');
+testCanvas.width = testCanvas.height = 1;
+const glCtx = testCanvas.getContext('webgl');
+
+export const MAX_TEX_SIZE = glCtx.getParameter(glCtx.MAX_TEXTURE_SIZE);

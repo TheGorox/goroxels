@@ -48,7 +48,7 @@ const camera = {
         this.clampPos();
     },
 
-    moveTo(movx, movy){
+    moveBy(movx, movy){
         globals.renderer.needRender = true;
         if(this.noMoving) return;
 

@@ -6,7 +6,8 @@ import '../../../node_modules/toastr/build/toastr.css'
 
 import querystring from 'querystring'
 import { rgb2uint32 } from '../convert/color'
-import { ROLE } from '../../../../goroxels-server/src/constants'
+import { ROLE } from '../constants';
+
 
 let canvases;
 
@@ -446,7 +447,7 @@ async function initBackup() {
 
         const cropEnabled = crop && $("#cropRollbackCB").is(':checked');
 
-        if(!cropEnabled){
+        if (!cropEnabled) {
             alert('Ебанулся?');
             return;
         }
