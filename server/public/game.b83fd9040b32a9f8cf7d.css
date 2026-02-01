@@ -9,8 +9,14 @@
     --light-text: #d2d2d2;
     --bg-text: gray;
 }
-/* Убираем спиннеры, которые мешают нормально центрировать текст */
+@font-face {
+  font-family: 'Russo One';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/font/RussoOne-Regular.ttf);
+}
 
+/* Убираем спиннеры, которые мешают нормально центрировать текст */
 input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
@@ -175,7 +181,7 @@ input[type=number] {
     }
 
     .showMenu, .hideMenu, #hideChat {
-        background-image: url(./img/arrow.svg);
+        background-image: url(/img/arrow.svg);
     }
 
     .showMenu, .showChat, #hideChat {
@@ -197,7 +203,7 @@ input[type=number] {
 
     .showChat {
         right: 50px;
-        background-image: url(./img/chat.svg);
+        background-image: url(/img/chat.svg);
     }
     .showChat.right {
         left: 50px;
@@ -205,7 +211,7 @@ input[type=number] {
     }
 
     .showChat-notify {
-        background-image: url(./img/chat-notif.svg);
+        background-image: url(/img/chat-notif.svg);
     }
 
     #hideChat {
@@ -239,7 +245,7 @@ input[type=number] {
 
     .discordBtn.mobile {
         display: block;
-        background-image: url(./img/discord.svg);
+        background-image: url(/img/discord.svg);
         left: 40px;
         background-size: 74%;
         background-position: center;
@@ -289,7 +295,7 @@ body, html {
     right: 0;
     overflow: hidden;
     touch-action: none;
-    font-family: "Russo One", sans-serif
+    font-family: sans-serif
 }
 
 body {
@@ -779,7 +785,7 @@ input[type=range]::-moz-range-thumb {
 }
 
 .windowHeader>.closeWindow>div {
-    background-image: url(./img/cross.svg);
+    background-image: url(/img/cross.svg);
     background-repeat: no-repeat;
     margin: 3px;
     width: inherit;
@@ -883,6 +889,11 @@ input[type=range]::-moz-range-thumb {
     word-break: break-word;
 }
 
+.messageTime {
+    color: #aaa;
+    font-size: 11px;
+}
+
 .messageText {
     font-weight: normal;
 }
@@ -965,6 +976,7 @@ input {
 
 .cordgo {
     cursor: pointer;
+    font-weight: bold;
 }
 
 /* placed pixels bubble */
@@ -1000,7 +1012,7 @@ input {
 }
 
 .helpBtn {
-    background-image: url(./img/question.svg);
+    background-image: url(/img/question.svg);
     background-size: 67%;
     background-repeat: no-repeat;
     background-position: center;
@@ -1036,7 +1048,7 @@ input {
 }
 
 .discordBtn.desktop {
-    background-image: url(./img/discord.svg);
+    background-image: url(/img/discord.svg);
     background-size: 25px;
     background-repeat: no-repeat;
     background-position: center;
@@ -1519,6 +1531,36 @@ textarea {
 /* it's in mini window so we can't take so much space */
 .bannedUntilNum {
     width: 60px;
+}
+
+.paletteCards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+}
+
+.paletteCard {
+    border-radius: 5px;
+    background-color: #404040;
+    /* width: 200px; */
+    padding: 10px;
+}
+
+.paletteCard:hover {
+    background-color: #444;
+}
+.paletteTitle {
+    font-size: 19px;
+    font-weight: bold;
+    text-align: center;
+}
+.palettePreview {
+    text-align: center;
+}
+.palettePreview > img {
+    width: 100%;
+
+    image-rendering: pixelated;
 }
 .toast-title {
   font-weight: bold;

@@ -1,41 +1,39 @@
 /******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
-/***/ "./src/img/sha.jpg":
+/***/ "./src/css/waiter.css"
+/*!****************************!*\
+  !*** ./src/css/waiter.css ***!
+  \****************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+// extracted by mini-css-extract-plugin
+
+
+/***/ },
+
+/***/ "./src/img/sha.jpg"
 /*!*************************!*\
   !*** ./src/img/sha.jpg ***!
   \*************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
-"use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (__webpack_require__.p + "/img/sha.jpg");
 
-/***/ }),
+/***/ },
 
-/***/ "./src/css/waiter.css":
-/*!****************************!*\
-  !*** ./src/css/waiter.css ***!
-  \****************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-// extracted by mini-css-extract-plugin
-
-
-/***/ }),
-
-/***/ "./src/js/admin/main.js":
+/***/ "./src/js/admin/main.js"
 /*!******************************!*\
   !*** ./src/js/admin/main.js ***!
   \******************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
-"use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _css_waiter_css__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../css/waiter.css */ "./src/css/waiter.css");
 /* harmony import */ var _img_sha_jpg__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../img/sha.jpg */ "./src/img/sha.jpg");
@@ -43,11 +41,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var querystring__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! querystring */ "./node_modules/querystring/index.js");
 /* harmony import */ var _convert_color__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../convert/color */ "./src/js/convert/color.js");
 /* harmony import */ var _convert_color__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_convert_color__WEBPACK_IMPORTED_MODULE_4__);
-/* harmony import */ var _goroxels_server_src_constants__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../../../goroxels-server/src/constants */ "../goroxels-server/src/constants.js");
-/* harmony import */ var _goroxels_server_src_constants__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_goroxels_server_src_constants__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var _constants__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../constants */ "./src/js/constants.js");
 /* provided dependency */ var toastr = __webpack_require__(/*! toastr */ "./node_modules/toastr/toastr.js");
 /* provided dependency */ var $ = __webpack_require__(/*! jquery */ "./node_modules/jquery/dist/jquery.js");
 // TODO add protected pixels support
+
 
 
 
@@ -495,7 +493,7 @@ async function initBackup() {
 
         const cropEnabled = crop && $("#cropRollbackCB").is(':checked');
 
-        if(!cropEnabled){
+        if (!cropEnabled) {
             alert('Ебанулся?');
             return;
         }
@@ -816,7 +814,7 @@ function createZoomView(canvas) {
         return toastr.error('Error while fetching /api/me:')
     }
     const me = await resp.json();
-    if (me.role < _goroxels_server_src_constants__WEBPACK_IMPORTED_MODULE_5__.ROLE.MOD) {
+    if (me.role < _constants__WEBPACK_IMPORTED_MODULE_5__.ROLE.MOD) {
         location.href = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
         return
     }
@@ -824,9 +822,9 @@ function createZoomView(canvas) {
     canvases = (await loadConfig()).canvases;
 
     switch (me.role) {
-        case _goroxels_server_src_constants__WEBPACK_IMPORTED_MODULE_5__.ROLE.ADMIN:
+        case _constants__WEBPACK_IMPORTED_MODULE_5__.ROLE.ADMIN:
             $('.admin').show();
-        case _goroxels_server_src_constants__WEBPACK_IMPORTED_MODULE_5__.ROLE.MOD:
+        case _constants__WEBPACK_IMPORTED_MODULE_5__.ROLE.MOD:
             $('.mod').show();
         default: {
             if (me.id == 1) {
@@ -849,55 +847,7 @@ function createZoomView(canvas) {
     initCanvasActions()
 })()
 
-/***/ }),
-
-/***/ "../goroxels-server/src/constants.js":
-/*!*******************************************!*\
-  !*** ../goroxels-server/src/constants.js ***!
-  \*******************************************/
-/***/ ((module) => {
-
-const SECOND = 1000,
-    MINUTE = SECOND * 60,
-    HOUR = MINUTE * 60,
-    DAY = HOUR * 24,
-    WEEK = DAY * 7,
-    MONTH = DAY * 30;
-
-const ROLE = {
-    BANNED: -1,
-    GUEST: 0,
-    USER: 1,
-    TRUSTED: 2,
-    MOD: 3,
-    ADMIN: 4
-}
-
-const ROLE_I = {};
-Object.keys(ROLE).forEach(x => ROLE_I[ROLE[x]] = x);
-
-const chatBucket = {
-    USER: [2000, 3],
-    TRUSTED: [1000, 4],
-    MOD: [500, 5],
-    ADMIN: [0, 32],
-}
-
-module.exports = {
-    SECOND,
-    MINUTE,
-    HOUR,
-    DAY,
-    WEEK,
-    MONTH,
-
-    ROLE,
-    ROLE_I,
-
-    chatBucket
-}
-
-/***/ })
+/***/ }
 
 /******/ 	});
 /************************************************************************/
@@ -910,6 +860,12 @@ module.exports = {
 /******/ 		var cachedModule = __webpack_module_cache__[moduleId];
 /******/ 		if (cachedModule !== undefined) {
 /******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Check if module exists (development only)
+/******/ 		if (__webpack_modules__[moduleId] === undefined) {
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
 /******/ 		}
 /******/ 		// Create a new module (and put it into the cache)
 /******/ 		var module = __webpack_module_cache__[moduleId] = {
@@ -1010,7 +966,7 @@ module.exports = {
 /******/ 	
 /******/ 	/* webpack/runtime/publicPath */
 /******/ 	(() => {
-/******/ 		__webpack_require__.p = ".";
+/******/ 		__webpack_require__.p = "";
 /******/ 	})();
 /******/ 	
 /******/ 	/* webpack/runtime/jsonp chunk loading */
@@ -1076,4 +1032,4 @@ module.exports = {
 /******/ 	
 /******/ })()
 ;
-//# sourceMappingURL=admin.af23d41cf7477d815b3e.bundle.js.map
+//# sourceMappingURL=admin.b243e8614f1d04edbc30.bundle.js.map

@@ -1,10 +1,296 @@
 (self["webpackChunkgoroxels_client"] = self["webpackChunkgoroxels_client"] || []).push([["penis"],{
 
-/***/ "./src/js/EventManager.js":
+/***/ "../shared/config.js"
+/*!***************************!*\
+  !*** ../shared/config.js ***!
+  \***************************/
+(module) {
+
+const mainPalette = [
+    [255, 255, 255],
+    [180, 180, 180],
+    [133, 133, 133],
+    [90, 90, 90],
+    [61, 61, 61],
+    [30, 30, 30],
+    [19, 19, 19],
+    [0, 0, 0],
+    [14, 7, 27],
+    [26, 25, 50],
+    [42, 47, 78],
+    [66, 76, 110],
+    [101, 115, 146],
+    [146, 161, 185],
+    [216, 220, 255],
+    [187, 254, 255],
+    [12, 241, 255],
+    [0, 205, 249],
+    [0, 172, 237],
+    [0, 152, 220],
+    [0, 105, 170],
+    [0, 57, 109],
+    [3, 25, 63],
+    [28, 20, 67],
+    [37, 27, 90],
+    [56, 42, 115],
+    [88, 56, 143],
+    [133, 72, 202],
+    [168, 113, 231],
+    [255, 173, 225],
+    [228, 109, 230],
+    [202, 72, 202],
+    [146, 220, 186],
+    [93, 175, 141],
+    [50, 132, 100],
+    [35, 103, 78],
+    [36, 82, 59],
+    [26, 122, 62],
+    [20, 160, 46],
+    [89, 193, 53],
+    [156, 219, 67],
+    [185, 228, 90],
+    [255, 235, 87],
+    [255, 200, 37],
+    [255, 162, 20],
+    [237, 118, 20],
+    [234, 89, 22],
+    [195, 64, 3],
+    [57, 31, 33],
+    [93, 44, 40],
+    [138, 72, 54],
+    [191, 111, 74],
+    [230, 156, 105],
+    [246, 202, 159],
+    [255, 223, 191],
+    [246, 129, 135],
+    [245, 85, 93],
+    [234, 50, 60],
+    [196, 36, 48],
+    [137, 30, 43],
+    [87, 28, 39],
+    [59, 20, 67],
+    [98, 36, 97],
+    [147, 56, 143]
+];
+
+const secondPalette = [[46,34,47],[62,53,70],[98,85,101],[150,108,108],[171,148,122],[105,79,98],[127,112,138],[155,171,178],[199,220,208],[255,255,255],[110,39,39],[179,56,49],[234,79,54],[245,125,74],[174,35,52],[232,59,59],[251,107,29],[247,150,23],[249,194,43],[122,48,69],[158,69,57],[205,104,61],[230,144,78],[251,185,84],[76,62,36],[103,102,51],[162,169,71],[213,224,75],[251,255,134],[22,90,76],[35,144,99],[30,188,115],[145,219,105],[205,223,108],[49,54,56],[55,78,74],[84,126,100],[146,169,132],[178,186,144],[11,94,101],[11,138,143],[14,175,155],[48,225,185],[143,248,226],[50,51,83],[72,74,119],[77,101,180],[77,155,230],[143,211,255],[69,41,63],[107,62,117],[144,94,169],[168,132,243],[234,173,237],[117,60,84],[162,75,111],[207,101,127],[237,128,153],[131,28,93],[195,36,84],[240,79,120],[246,129,129],[252,167,144],[253,203,176]]
+
+module.exports = {
+    "canvases": [{
+        "name": "main",
+        "cooldown": {
+            "GUEST": [100, 25],
+            "USER": [30, 40],
+            "TRUSTED": [0, 32],
+            "MOD": [0, 32]
+        },
+        "chunkSize": 256,
+        "boardWidth": 32,
+        "boardHeight": 32,
+        "palette": [...mainPalette, ...secondPalette],
+        "extra": {
+            "palettes": [
+                {
+                    "name": "Goroxels Old",
+                    "slice": [0, 64]
+                },
+                {
+                    "name": "Goroxels New",
+                    "slice": [64]
+                },
+            ]
+        }
+    },
+    {
+        "name": "test",
+        "require": null,
+        "cooldown": {
+            "GUEST": [100, 16],
+            "USER": [50, 32],
+            "TRUSTED": [20, 600],
+            "MOD": [25, 32]
+        },
+        "chunkSize": 512,
+        "boardWidth": 8,
+        "boardHeight": 8,
+        "palette": [
+            [255, 255, 255],
+            [127, 127, 127],
+            [0, 0, 0]
+        ]
+    },
+    {
+        "name": "timgorox",
+        "cooldown": {
+            "GUEST": [0, 32],
+            "USER": [0, 32],
+            "TRUSTED": [0, 32],
+            "MOD": [0, 32]
+        },
+        "chunkSize": 480,
+        "boardWidth": 4,
+        "boardHeight": 4,
+        "palette": mainPalette
+    },
+    {
+        "name": "nsfw",
+        "cooldown": {
+            "GUEST": [1, 0],
+            "USER": [30, 40],
+            "TRUSTED": [20, 60],
+            "MOD": [0, 32]
+        },
+        "chunkSize": 256,
+        "boardWidth": 10,
+        "boardHeight": 5,
+        "require": "user",
+        "palette": mainPalette
+    },
+    {
+        "name": "timo",
+        "cooldown": {
+            "GUEST": [1, 0],
+            "USER": [30, 40],
+            "TRUSTED": [20, 60],
+            "MOD": [0, 32]
+        },
+        "chunkSize": 256,
+        "boardWidth": 5,
+        "boardHeight": 2,
+        "require": "user",
+        "palette": mainPalette
+    },
+    {
+        "name": "gorox",
+        "cooldown": {
+            "GUEST": [1, 0],
+            "USER": [30, 40],
+            "TRUSTED": [7, 60],
+            "MOD": [0, 32]
+        },
+        "chunkSize": 256,
+        "boardWidth": 18,
+        "boardHeight": 13,
+        "require": "user",
+        "palette": mainPalette
+    },
+    {
+        "name": "BEARZ",
+        "cooldown": {
+            "GUEST": [100, 25],
+            "USER": [30, 40],
+            "TRUSTED": [0, 32],
+            "MOD": [0, 32]
+        },
+        "chunkSize": 256,
+        "boardWidth": 8,
+        "boardHeight": 8,
+        "palette": mainPalette
+    },
+    {
+        "name": "elka",
+        "cooldown": {
+            "GUEST": [100, 25],
+            "USER": [30, 40],
+            "TRUSTED": [0, 32],
+            "MOD": [0, 32]
+        },
+        "chunkSize": 256,
+        "boardWidth": 10,
+        "boardHeight": 14,
+        "palette": [...mainPalette, ...secondPalette],
+        "extra": {
+            "palettes": [
+                {
+                    "name": "Goroxels Old",
+                    "slice": [0, 64]
+                },
+                {
+                    "name": "Goroxels New",
+                    "slice": [64]
+                },
+            ]
+        }
+    },
+],
+    "telek": {
+        x: 3280,
+        y: 1524,
+        size: 250,
+        canvas: 0
+    }
+}
+
+/***/ },
+
+/***/ "./src/img/palettePreviews sync \\.png$"
+/*!***********************************************************!*\
+  !*** ./src/img/palettePreviews/ sync nonrecursive \.png$ ***!
+  \***********************************************************/
+(module, __unused_webpack_exports, __webpack_require__) {
+
+var map = {
+	"./Goroxels New.png": "./src/img/palettePreviews/Goroxels New.png",
+	"./Goroxels Old.png": "./src/img/palettePreviews/Goroxels Old.png"
+};
+
+
+function webpackContext(req) {
+	var id = webpackContextResolve(req);
+	return __webpack_require__(id);
+}
+function webpackContextResolve(req) {
+	if(!__webpack_require__.o(map, req)) {
+		var e = new Error("Cannot find module '" + req + "'");
+		e.code = 'MODULE_NOT_FOUND';
+		throw e;
+	}
+	return map[req];
+}
+webpackContext.keys = function webpackContextKeys() {
+	return Object.keys(map);
+};
+webpackContext.resolve = webpackContextResolve;
+module.exports = webpackContext;
+webpackContext.id = "./src/img/palettePreviews sync \\.png$";
+
+/***/ },
+
+/***/ "./src/img/palettePreviews/Goroxels New.png"
+/*!**************************************************!*\
+  !*** ./src/img/palettePreviews/Goroxels New.png ***!
+  \**************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (__webpack_require__.p + "/img/Goroxels New.png");
+
+/***/ },
+
+/***/ "./src/img/palettePreviews/Goroxels Old.png"
+/*!**************************************************!*\
+  !*** ./src/img/palettePreviews/Goroxels Old.png ***!
+  \**************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (__webpack_require__.p + "/img/Goroxels Old.png");
+
+/***/ },
+
+/***/ "./src/js/EventManager.js"
 /*!********************************!*\
   !*** ./src/js/EventManager.js ***!
   \********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -138,17 +424,18 @@ class EventManager extends (events__WEBPACK_IMPORTED_MODULE_0___default()) {
     }
 }
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/config.js":
+/***/ "./src/js/config.js"
 /*!**************************!*\
   !*** ./src/js/config.js ***!
   \**************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   allColors: () => (/* binding */ allColors),
 /* harmony export */   argbToId: () => (/* binding */ argbToId),
 /* harmony export */   bgrPalette: () => (/* binding */ bgrPalette),
 /* harmony export */   boardChunkHei: () => (/* binding */ boardChunkHei),
@@ -160,76 +447,87 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   canvasName: () => (/* binding */ canvasName),
 /* harmony export */   chunkSize: () => (/* binding */ chunkSize),
 /* harmony export */   cooldown: () => (/* binding */ cooldown),
+/* harmony export */   currentPalette: () => (/* binding */ currentPalette),
+/* harmony export */   currentPaletteColors: () => (/* binding */ currentPaletteColors),
 /* harmony export */   download: () => (/* binding */ download),
 /* harmony export */   downloaded: () => (/* binding */ downloaded),
 /* harmony export */   game: () => (/* binding */ game),
 /* harmony export */   hexPalette: () => (/* binding */ hexPalette),
-/* harmony export */   palette: () => (/* binding */ palette),
+/* harmony export */   palettePreviews: () => (/* binding */ palettePreviews),
+/* harmony export */   palettes: () => (/* binding */ palettes),
 /* harmony export */   resolveWhenConfigDownloaded: () => (/* binding */ resolveWhenConfigDownloaded),
+/* harmony export */   setCurrentPalette: () => (/* binding */ setCurrentPalette),
 /* harmony export */   showProtected: () => (/* binding */ showProtected)
 /* harmony export */ });
 /* harmony import */ var _utils_color__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./utils/color */ "./src/js/utils/color.js");
 /* harmony import */ var _utils_localStorage__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./utils/localStorage */ "./src/js/utils/localStorage.js");
-/* provided dependency */ var toastr = __webpack_require__(/*! toastr */ "./node_modules/toastr/toastr.js");
+/* harmony import */ var _shared_config__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../shared/config */ "../shared/config.js");
+/* harmony import */ var _shared_config__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_shared_config__WEBPACK_IMPORTED_MODULE_2__);
+
 
 
 
 let canvasId;
-
-let
-    canvasName,
-    chunkSize,
-    boardWidth, boardHeight,
-    palette
-
+let canvasName, chunkSize, boardWidth, boardHeight, allColors, currentPaletteColors, currentPalette, palettes;
 let downloaded = false;
 
-let
-    // a palette for fast rendering
-    bgrPalette, hexPalette,
-    boardChunkWid, boardChunkHei,
-    cooldown;
+let bgrPalette, hexPalette, boardChunkWid, boardChunkHei, cooldown;
 
 const game = {
     chatLimit: parseInt((0,_utils_localStorage__WEBPACK_IMPORTED_MODULE_1__.getOrDefault)('chatLimit', 100), 10),
-    showProtected: false
+    showProtected: false,
+};
+
+let palettePreviews = {};
+const requirePreview = __webpack_require__("./src/img/palettePreviews sync \\.png$");
+requirePreview.keys().map(requirePreview).forEach(path => {
+    const filename = path.default.match(/([\w\d_\s]+)\.png$/);
+    palettePreviews[filename[1]] = path.default;
+});
+
+function setCurrentPalette(palette){
+    let startIdx = 0, endIdx = allColors.length;
+    if (!palette) {
+        currentPaletteColors = allColors;
+    } else {
+        currentPalette = palette;
+
+        startIdx = palette.slice[0];
+        endIdx = palette.slice[1] || endIdx;
+
+        currentPaletteColors = allColors.slice(startIdx, endIdx);
+    }
+
+    return [currentPaletteColors, startIdx, endIdx];
 }
+
 
 let argbToId = {};
 
-async function loadConfig(){
-    const response = await fetch('/config.json');
-    return await response.json();
-}
-
 async function download() {
-    let config
-    try{
-        config = await loadConfig();
-    }catch(e){
-        toastr.error('Failed to load config from server. Try to reload the page');
-    }
-
     const path = document.location.pathname.replace(/[^\d^\w]/g, '');
-    let index = config.canvases.findIndex(canvas => canvas.name === path);
+    const index = _shared_config__WEBPACK_IMPORTED_MODULE_2___default().canvases.findIndex(canvas => canvas.name === path);
     canvasId = index === -1 ? 0 : index;
 
-    let canvasCfg = config.canvases[canvasId];
+    const canvasCfg = (_shared_config__WEBPACK_IMPORTED_MODULE_2___default().canvases)[canvasId];
 
-    canvasName = canvasCfg.name,
-        chunkSize = canvasCfg.chunkSize,
-        boardWidth = canvasCfg.boardWidth * chunkSize,
-        boardHeight = canvasCfg.boardHeight * chunkSize,
-        palette = canvasCfg.palette;
+    canvasName = canvasCfg.name;
+    chunkSize = canvasCfg.chunkSize;
+    boardWidth = canvasCfg.boardWidth * chunkSize;
+    boardHeight = canvasCfg.boardHeight * chunkSize;
+    allColors = currentPaletteColors = canvasCfg.palette;
+    palettes = canvasCfg.extra?.palettes ?? null;
 
-    // palette for fast rendering
-    bgrPalette = new Uint32Array(palette.map((rgb) => (0,_utils_color__WEBPACK_IMPORTED_MODULE_0__.rgb2abgr)(...rgb))),
-        hexPalette = palette.map(_utils_color__WEBPACK_IMPORTED_MODULE_0__.rgb2hex),
-        boardChunkWid = canvasCfg.boardWidth,
-        boardChunkHei = canvasCfg.boardHeight,
-        cooldown = canvasCfg.cooldown;
+    // Быстрая палитра
+    bgrPalette = new Uint32Array(allColors.map(rgb => (0,_utils_color__WEBPACK_IMPORTED_MODULE_0__.rgb2abgr)(...rgb)));
+    hexPalette = allColors.map(_utils_color__WEBPACK_IMPORTED_MODULE_0__.rgb2hex);
+    boardChunkWid = canvasCfg.boardWidth;
+    boardChunkHei = canvasCfg.boardHeight;
+    cooldown = canvasCfg.cooldown;
 
-    Array.from(bgrPalette.values()).forEach((argb, i) => argbToId[argb] = i);
+    for (let i = 0; i < bgrPalette.length; i++) {
+        argbToId[bgrPalette[i]] = i;
+    }
 
     downloaded = true;
     toCall.forEach(f => f());
@@ -237,42 +535,130 @@ async function download() {
 }
 
 let toCall = [];
-function callOnLoad(cb){
-    if(downloaded) return cb();
-    toCall.push(cb);
+function callOnLoad(cb) {
+    if (downloaded) cb();
+    else toCall.push(cb);
 }
 
-// the same as above but in the Promise format
-async function resolveWhenConfigDownloaded() {
-    if (downloaded) {
-        return;
-    } else {
-        return new Promise(res => {
-            const int = setInterval(() => {
-                if (downloaded) {
-                    clearInterval(int);
-                    res();
-                }
-            }, 10);
-        })
-    }
+function resolveWhenConfigDownloaded() {
+    if (downloaded) return Promise.resolve();
+    return new Promise(res => {
+        const int = setInterval(() => {
+            if (downloaded) {
+                clearInterval(int);
+                res();
+            }
+        }, 10);
+    });
 }
 
 function showProtected(show = true) {
     game.showProtected = show;
-    globals.chunkManager.chunks.forEach(chunk => {
-        chunk.needRender = true;
-    });
+    globals.chunkManager.chunks.forEach(chunk => chunk.needRender = true);
     globals.renderer.needRender = true;
 }
 
-/***/ }),
 
-/***/ "./src/js/convert/color.js":
+/***/ },
+
+/***/ "./src/js/constants.js"
+/*!*****************************!*\
+  !*** ./src/js/constants.js ***!
+  \*****************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   ROLE: () => (/* binding */ ROLE),
+/* harmony export */   ROLE_I: () => (/* binding */ ROLE_I),
+/* harmony export */   keys: () => (/* binding */ keys)
+/* harmony export */ });
+// key codes to human readable string
+// !deprecated!
+const keys = { // others are ok with charCodeAt
+    8: "Backspace",
+    9: "Tab",
+    12: "Clear",
+    13: "Enter",
+    16: "Shift",
+    17: "Control",
+    18: "Alt",
+    19: "Pause",
+    20: "CapsLock",
+    27: "Escape",
+    32: "Space",
+    33: "PageUp",
+    34: "PageDown",
+    35: "End",
+    36: "Home",
+    37: "ArrowLeft",
+    38: "ArrowUp",
+    39: "ArrowRight",
+    40: "ArrowDown",
+    45: "Insert",
+    46: "Delete",
+    112: "F1",
+    113: "F2",
+    114: "F3",
+    115: "F4",
+    116: "F5",
+    117: "F6",
+    118: "F7",
+    119: "F8",
+    120: "F9",
+    121: "F10",
+    122: "F11",
+    123: "F12",
+    144: "NumLock",
+    145: "ScrollLock",
+    48: "0",
+    49: "1",
+    50: "2",
+    51: "3",
+    52: "4",
+    53: "5",
+    54: "6",
+    55: "7",
+    56: "8",
+    57: "9",
+    106: "*",
+    107: "+",
+    109: "-",
+    111: "/",
+    186: ";",
+    187: "=",
+    188: ",",
+    189: "-",
+    190: ".",
+    191: "/",
+    192: "`",
+    219: "[",
+    220: "\\",
+    221: "]",
+    222: "'"
+}
+
+const ROLE = {
+    BANNED: -1,
+    GUEST: 0,
+    USER: 1,
+    TRUSTED: 2,
+    MOD: 3,
+    ADMIN: 4
+}
+const ROLE_I = {};
+Object.keys(ROLE).forEach(x => ROLE_I[ROLE[x]] = x);
+
+
+
+/***/ },
+
+/***/ "./src/js/convert/color.js"
 /*!*********************************!*\
   !*** ./src/js/convert/color.js ***!
   \*********************************/
-/***/ ((module) => {
+(module) {
 
 // Stolen and edited from pxlsfiddle
 const colorManip = {
@@ -980,13 +1366,106 @@ const cm = colorManip;
 
 module.exports = colorManip
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/convert/patterns.js":
+/***/ "./src/js/convert/matrices/bayer.js"
+/*!******************************************!*\
+  !*** ./src/js/convert/matrices/bayer.js ***!
+  \******************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+const bayer2x2 = [
+    [0, 2],
+    [3, 1]
+];
+
+const bayer4x4 = [
+    [0, 8, 2, 10],
+    [12, 4, 14, 6],
+    [3, 11, 1, 9],
+    [15, 7, 13, 5]
+];
+
+const bayer8x8 = [
+    [0, 48, 12, 60, 3, 51, 15, 63],
+    [32, 16, 44, 28, 35, 19, 47, 31],
+    [8, 56, 4, 52, 11, 59, 7, 55],
+    [40, 24, 36, 20, 43, 27, 39, 23],
+    [2, 50, 14, 62, 1, 49, 13, 61],
+    [34, 18, 46, 30, 33, 17, 45, 29],
+    [10, 58, 6, 54, 9, 57, 5, 53],
+    [42, 26, 38, 22, 41, 25, 37, 21]
+];
+
+const bayer16x16 = [
+    [0, 128, 32, 160, 8, 136, 40, 168, 2, 130, 34, 162, 10, 138, 42, 170],
+    [192, 64, 224, 96, 200, 72, 232, 104, 194, 66, 226, 98, 202, 74, 234, 106],
+    [48, 176, 16, 144, 56, 184, 24, 152, 50, 178, 18, 146, 58, 186, 26, 154],
+    [240, 112, 208, 80, 248, 120, 216, 88, 242, 114, 210, 82, 250, 122, 218, 90],
+    [12, 140, 44, 172, 4, 132, 36, 164, 14, 142, 46, 174, 6, 134, 38, 166],
+    [204, 76, 236, 108, 196, 68, 228, 100, 206, 78, 238, 110, 198, 70, 230, 102],
+    [60, 188, 28, 156, 52, 180, 20, 148, 62, 190, 30, 158, 54, 182, 22, 150],
+    [252, 124, 220, 92, 244, 116, 212, 84, 254, 126, 222, 94, 246, 118, 214, 86],
+    [3, 131, 35, 163, 11, 139, 43, 171, 1, 129, 33, 161, 9, 137, 41, 169],
+    [195, 67, 227, 99, 203, 75, 235, 107, 193, 65, 225, 97, 201, 73, 233, 105],
+    [51, 179, 19, 147, 59, 187, 27, 155, 49, 177, 17, 145, 57, 185, 25, 153],
+    [243, 115, 211, 83, 251, 123, 219, 91, 241, 113, 209, 81, 249, 121, 217, 89],
+    [15, 143, 47, 175, 7, 135, 39, 167, 13, 141, 45, 173, 5, 133, 37, 165],
+    [207, 79, 239, 111, 199, 71, 231, 103, 205, 77, 237, 109, 197, 69, 229, 101],
+    [63, 191, 31, 159, 55, 183, 23, 151, 61, 189, 29, 157, 53, 181, 21, 149],
+    [255, 127, 223, 95, 247, 119, 215, 87, 253, 125, 221, 93, 245, 117, 213, 85]
+];
+
+const custom4x4 = [
+    [0, 0, 0, 1],
+    [0, 5, 4, 2],
+    [0, 0, 0, 3],
+    [0, 0, 0, 0],
+];
+
+const custom8x8 = [
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 13, 0, 0, 0, 8],
+    [0, 15, 14, 12, 0, 10, 9, 7],
+    [0, 0, 0, 11, 23, 0, 0, 6],
+    [0, 0, 25, 24, 22, 0, 0, 0],
+    [0, 0, 0, 3, 21, 0, 0, 18],
+    [0, 5, 4, 2, 0, 20, 19, 17],
+    [0, 0, 0, 1, 0, 0, 0, 16]
+]; // yessir, penises
+
+const custom7x7 = [
+    [1, 3, 37, 9, 11, 45, 43],
+    [4, 2, 47, 12, 10, 26, 28],
+    [30, 44, 17, 47, 36, 29, 27],
+    [13, 15, 46, 5, 7, 38, 40],
+    [16, 14, 42, 8, 6, 41, 39],
+    [48, 22, 24, 31, 33, 18, 20],
+    [35, 25, 23, 34, 32, 21, 19]
+];
+
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({
+    2: bayer2x2,
+    4: bayer4x4,
+    8: bayer8x8,
+    16: bayer16x16,
+    c4: custom4x4,
+    c8: custom8x8,
+    c7: custom7x7
+});
+
+/***/ },
+
+/***/ "./src/js/convert/patterns.js"
 /*!************************************!*\
   !*** ./src/js/convert/patterns.js ***!
   \************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -1585,13 +2064,13 @@ const defaultPattern = [
     0, 0, 0, 0, 0, 0, 0,
 ];
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/globals.js":
+/***/ "./src/js/globals.js"
 /*!***************************!*\
   !*** ./src/js/globals.js ***!
   \***************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -1647,13 +2126,13 @@ __webpack_require__.r(__webpack_exports__);
     wandSelectedColor: null
 });
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/translate.js":
+/***/ "./src/js/translate.js"
 /*!*****************************!*\
   !*** ./src/js/translate.js ***!
   \*****************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -1695,13 +2174,13 @@ function init() {
     }
 }
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/translates.js":
+/***/ "./src/js/translates.js"
 /*!******************************!*\
   !*** ./src/js/translates.js ***!
   \******************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -1734,13 +2213,13 @@ const userLanguage = languages[lang] || languages['en'];
     }
 });
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/translates/en.js":
+/***/ "./src/js/translates/en.js"
 /*!*********************************!*\
   !*** ./src/js/translates/en.js ***!
   \*********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -1750,126 +2229,189 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({
     // main section
     // html
-    'Goroxels': 'Goroxels',
+    'Goroxels': 'Goroxels', // I don’t know whether to translate the name or not, but it sounds cooler in English (John)
     'CHAT': 'CHAT',
-    'login to chat': 'login to chat',
+    'login to chat': 'log in to chat',
+    'chat.you': 'You',
+    'chat.muteDesc': 'NICK (with color codes) - mute the player (for yourself)',
+    'chat.unmuteDesc': 'NICK (with color codes) - unmute the player',
+    'chat.wDesc': 'ID MESSAGE - private message to the player',
     'template': 'template',
-    'template url': 'template url',
+    'template url': 'image link', // (template) (John)
     'template opacity': 'template opacity',
     'settings': 'settings',
-    'game settings': 'game settings',
-    'open window': 'open window',
+    'game settings': 'general settings',
+    'open window': 'configure', // open window would be aptly translated as configure (open the settings window) (John)
     'account settings': 'account settings',
-    'change name': 'change name',
-    'logout': 'logout',
-    'toolbinds settings': 'toolbinds settings',
-    'ui settings': 'ui settings',
+    'change name': 'change nickname',
+    'logout': 'log out',
+    'toolbinds settings': 'hotkeys',
+    'ui settings': 'UI settings',
     'tools': 'tools',
     'online': 'online',
-    'Send alerts': 'Send alerts',
+    'Send alerts': 'Send alerts', // ? (John)
     // js and others
-    // tools subsection
-    'clicker': 'clicker',
-    'protector': 'protector',
-    'alt protector': 'alt protector',
-    'mover': 'mover',
-    'floodfill': 'floodfill',
-    'pipette': 'pipette',
-    'alt pipette': 'alt pipette',
-    'coords to chat': 'coords to chat',
-    'pixel info': 'pixel info',
-    'swap colors': 'swap colors',
-    'left color': 'left color',
-    'right color': 'right color',
-    'toggle chat': 'toggle chat',
-    'toggle menu': 'toggle menu',
-    'toggle everything': 'toggle everything',
-    'ctrlZ': 'ctrlZ',
-    'grid': 'grid',
-    'paste': 'paste',
-    'template 0/N opaq': 'template 0/N opaq',
-    'template 1/N opaq': 'template 1/N opaq',
-    'square': 'square',
-    '+brush size': '+brush size',
-    '-brush size': '-brush size',
-    'copy': 'copy',
+    'Error!': 'Error!',
+    'error.protected_pixel': 'Pixel is protected!',
+    // confirm windows
+    'OK': 'OK',
+    'Cancel': 'Cancel',
+
+    'confirm_template_deletion': 'Confirm template deletion?',
+
+    'templates_title': 'Templates',
+
+    'time.minute': 'Minute',
+    'time.hour': 'Hour',
+    'time.day': 'Day',
+
+    // gradient miniwindow
+    'gradient': 'Gradient',
+    'fill_mode.global': 'global',
+    'fill_mode.floodfill': 'flood fill',
+    'bayer': 'matrix',
+    'radial': 'radial',
+    'magnet_mode': 'magnet mode',
+
+    'change_palette': 'Change active palette',
+    'select_palette_title': 'Choose a palette',
+    'have_you_seen_pal_update_title': 'Rumor has it...',
+    'have_you_seen_pal_update_body': 'Now the site has two palettes!',
+    'show_me_palette_update': 'Show me!!!',
+
+        // palette hotkey notif
+    'psst': 'psst...',
+    'use_p_to_swap_palette': 'Press H to swap palettes',
+
+    'socketErr.banned': 'You have been banned. If you believe this is a mistake, contact the administration (Telegram/Discord is in Help)',
+    'socketErr.bannedUntil': `You have been temporarily banned. Ban lifts in: `,
+
+    // tools.js
+    'paste.choose_from': 'Choose where to paste from',
+    'from_clipboard': 'From clipboard',
+    'from_file': 'From file',
+
+    // player info window
+    'ban_menu': 'ban menu',
+    'ban_menu_for': 'ban menu for',
+    'label.shadowBanned': 'shadowban',
+    'label.banned': 'full ban',
+
+    'btn.sendAlert': 'Send notification',
+    'btn.sendModal': 'Send fullscreen',
+    // tools names subsection
+    'toolName.clicker': 'clicker',
+    'toolName.mover': 'mover',
+    'toolName.floodfill': 'floodfill',
+    'toolName.pipette': 'pipette',
+    'toolName.alt pipette': 'alt pipette 2nd color',
+    'toolName.line': 'line',
+    'toolName.right color': 'right color',
+    'toolName.left color': 'left color',
+    'toolName.swap colors': 'swap colors',
+    'toolName.toggle chat': 'toggle chat',
+    'toolName.toggle menu': 'toggle menu',
+    'toolName.toggle everything': 'toggle everything',
+    'toolName.ctrlZ': 'undo pixel',
+    'toolName.protector': 'protector',
+    'toolName.alt protector': 'erase protection',
+    'toolName.grid': 'grid',
+    'toolName.copy': 'copy',
+    'toolName.paste': 'paste',
+    'toolName.coords to chat': 'send coords to chat',
+    'toolName.template 0/N opaq': 'template opacity 0/N',
+    'toolName.template 1/N opaq': 'template opacity 1/N',
+    'toolName.square': 'rectangle',
+    'toolName.+brush size': 'brush size +',
+    'toolName.-brush size': 'brush size -',
+    'toolName.pixel info': 'who placed the pixel',
+    'toolName.text': 'draw text',
+    'toolName.reset colors': 'reset color selection',
+        'toolName.wand': 'Magic Wand',
+    'toolName.colorador': 'Colors Disabler',
+    'toolName.palette_swap': 'Palette Swap',
+
     // end tools subsection
-    'colors size': 'colors size',
-    'palette width': 'palette width',
+    'colors size': 'color size', // increases the size of color squares in the palette -> enlarges the palette (John)
+    'palette width': 'palette size',
     'hide emojis': 'hide emojis',
-    'emoji list': 'emoji list',
-    'super secret button': 'super secret button',
-    'show placed pixels': 'show placed pixels',
-    'show patterns over the palette': 'show patterns over the palette',
-    'more emojis!': 'more emojis!',
-    'show protected': 'show protected',
+    'emoji list': 'list of available emojis',
+    'super secret button': 'whoever clicks it is gay',
+    'show placed pixels': 'show pixel counter',
+    'show patterns over the palette': 'patterns over the palette',
+    'tools_to_right_pos': 'tools on the right side',
+    'more emojis!': 'pile on the emojis!',
+    'show protected': 'show protected pixels',
     'brush size': 'brush size',
-    'max saved pixels': 'max saved pixels',
+    'max saved pixels': 'maximum saved pixels',
     'disable chat colors': 'disable chat colors',
     'chat messages limit': 'chat messages limit',
     'light grid': 'light grid',
     'enable grid': 'enable grid',
-    'draw line length': 'draw line length',
-    'Case insensitive, 0/o i/l are same': 'Case insensitive, 0/o i/l are same',
-    'Can\'t recognize?': 'Can\'t recognize?',
+    'draw line length': 'display line length',
+    'Case insensitive, 0/o i/l are same': 'Case insensitive, O/o and I/i are the same', // for captcha, if the image has HJKfY78, the value hjkfy78 will be accepted (John)
+    'Can\'t recognize?': 'Can’t read it?',
     'Captcha': 'Captcha',
     'search users': 'search users',
     'OR': 'OR',
     'banned?': 'banned?',
-    'convert image into palette': 'convert image into palette',
-    'save canvas': 'save canvas',
-    'intro.introHeader': 'Where am I?',
-    // help
+    'convert image into palette': 'convert image to palette',
+    'save canvas': 'download canvas',
+    'tools.showPrevWipesBtn': 'view previous wipes',
+    'prevWipesWinTitle': 'Old wipes',
+    // rus intro translate (John)
     'intro.introHeader': 'where am I',
     'how to play?': 'how to play?',
     'tools': 'tools',
     'intro.tools2header': 'underground tools',
-    'intro.desc': ' - an online pixel canvas, made with love.',
-    'intro.desc2': 'You can draw <b>without registration</b>. But if you register, you\'ll be able to paint <b>even faster</b> (+you\'ll unlock chat and some tools. And a +5 luck bonus)',
-    'intro.howToPlayDecs': 'It\'s trivial: choose a color below, click on the canvas - a pixel will appear. Very simple. <br><i>but that\'s far from all</i>👁️',
-    'intro.toolsDecs': 'To make life easier and grass greener, we\'ve made some features:<br><i>P.S. All keys can be remapped in settings. If you\'re on mobile, many tools are available for selection from the top left</i>',
-    'intro.toolsClicker': '<b>Clicker</b><br>YES, it clicks. NO, it won\'t draw for you. [Space]<br>',
-    'intro.toolsAS': '<b>Back and forth</b><br>You can quickly switch colors using [A] and [S]',
-    'intro.toolC': '<b>Eyedropper</b><br>The game has an eyedropper [C]',
-    'intro.brush': '<b>Brush</b><br>For those who behaved well, a larger drawing tool is available<br>',
-    'intro.line': '<b>Line</b><br>For straight-edge guys [Shift]',
-    'intro.flood': '<b>Fill</b><br>Stop feeding me lines! [F]<br>',
-    'intro.resetColors': '<b>Reset selected color</b><br>with a simple hand movement [RMB] (right click)',
-    'intro.grid': '<b>Grid</b><br>toggled with [G]',
+    'intro.desc': ' - online pixel canvas, made with love.',
+    'intro.desc2': 'You can draw <b>without registration</b>. But if you register, you can paint <b>even faster</b> (+ you’ll unlock chat and some tools. And a bonus +5 to luck)',
+    'intro.howToPlayDecs': 'It’s simple: choose a color at the bottom, click on the canvas - a pixel appears. Very easy. <br><i>but that’s far from everything</i>👁️',
+    'intro.toolsDecs': 'To make life easier and the grass greener, we’ve added some features:<br><i>P.S. all keys can be reassigned in settings. And if you’re on a phone, many tools are available for selection at the top left</i>',
+    'intro.toolsClicker': '<b>Clicker</b><br>YES, it clicks. NO, it won’t draw for you. [Space]<br>',
+    'intro.toolsAS': '<b>Back and forth</b><br>Quickly switch colors with [A] and [S]',
+    'intro.toolC': '<b>Pipette</b><br>The game has a pipette [C]',
+    'intro.brush': '<b>Brush</b><br>For those who behave well, a larger brush is available<br>',
+    'intro.line': '<b>Line</b><br>For straight-up guys [Shift]',
+    'intro.flood': '<b>Floodfill</b><br>What are you flooding me with! [F]<br>',
+    'intro.resetColors': '<b>Reset selected color</b><br>can be done with a flick of the wrist [RMB] (right-click)',
+    'intro.grid': '<b>Grid</b><br> enabled with [G]',
     'intro.ctrlZ': '<b>Undo</b><br>You can even undo pixels! Key: [Z]<br>',
-    'intro.tools2desc': 'These are additional tools, but that only makes them cooler!!',
-    'intro.toolsHiders': '<b>Hide unnecessary stuff</b><br>from the interface with separate keybinds. [K] hides chat, [L] hides the top panel, and [;] hides everything at once',
-    'intro.multicol': '<b>Multicolor</b><br>For advanced users, we\'ve added multicolor support - when the brush paints with two colors simultaneously, alternating them. <br>Why? Some images with <a href="//en.wikipedia.org/wiki/Dithering" target="_blank">dithering</a> are much easier to draw this way. Worth trying.',
-    'intro.multicol2': 'Select second color [RMB] on palette color/[Alt+C] on canvas.',
+    'intro.tools2desc': 'These tools are optional, but they’re only cooler for it!!',
+    'intro.toolsHiders': '<b>Hide the extras</b><br>from the interface with separate keybinds. [K] hides the chat, [L] hides the top panel, and [;] hides everything at once',
+    'intro.multicol': '<b>Multicolor</b><br>For advanced users, we’ve added multicolor support - when the brush paints with two colors, alternating them. <br>Why? Some images with <a href="//en.wikipedia.org/wiki/Dithering" target="_blank">dithering</a> are much easier to draw this way. Worth a try.',
+    'intro.multicol2': 'Select the second color with [RMB] on a color in the palette/[Alt+C] on the canvas.',
     'intro.multicol3': '(Mixed up the order? Just press [X])',
-    'intro.sendCoords': '<b>Send coordinates to chat</b><br>by pressing [U]',
-    'intro.templateTools': '<b>Template</b><br>has its own binds too! [O] and [P] instantly switch its transparency.<br>You can also move the template by holding [Ctrl] and [LMB]',
-    'intro.templateIntro': 'Wanderer, you\'ve come so far! Well then, I\'ll share a secret...',
-    'intro.templateDesc': 'The principle is simple and, if it helps, roughly the same as pxls.space. <br>You paste a direct image link in the URL field (top left), enter the desired coordinates and draw over it',
-    'intro.templateDescConvert': '<b>But my image isn\'t in the palette :(</b><br>If you want it in palette - go to <a href="/convert" target="_blank">/convert</a>. Paste your image in the input field at the top.',
-    'intro.templateDescReminder': '<b>BY THE WAY</b><br>you can draw exactly like in this video. Want to do the same? Go to <a href="/convert" target="_blank">/convert</a> (convert to pattern -> [upload image to imgur])<br>'+
-        '<i>P.S. Better set template opacity to maximum.</i><br>'+
-        '<i>P.P.S. if the link is red - you\'ll have to upload manually. Instructions: </i><a href="//vk.cc/cOCbAd" target="_blank">vk.cc/cOCbAd</a>',
+    'intro.sendCoords': '<b>Coordinates to chat</b><br>can be sent by pressing [U]',
+    'intro.templateTools': '<b>Template</b><br>there are binds for templates too! [O] and [P] instantly toggle its opacity.<br>Plus, you can move the template by holding [Ctrl] and [LMB]',
+    'intro.templateIntro': 'Wanderer, you’ve come so far! Well, I’ll share a secret...',
+    'intro.templateDesc': 'The principle is simple and, if it helps, roughly the same as pxls.space. <br>You insert a direct image link into the URL field (top left), enter the desired coordinates, and draw over it',
+    'intro.templateDescConvert': '<b>But my image isn’t in the palette :(</b><br>If you want it in the palette, go to <a href="/convert" target="_blank">/convert</a>. Insert the image into the input field at the top.',
+    'intro.templateDescReminder': '<b>BY THE WAY</b><br>you can draw just like in this video. Want the same? Go to <a href="/convert" target="_blank">/convert</a> (convert to pattern -> [upload image to imgur])<br>'+
+        '<i>P.S. Set template opacity to maximum.</i><br>'+
+        '<i>P.P.S. If the link is red, you’ll have to upload manually. Instructions: </i><a href="//vk.cc/cOCbAd" target="_blank">vk.cc/cOCbAd</a>',
     'intro.authorHeader': 'author',
-    'intro.authorText':'Authors - Gorokh and Comrades',
+    'intro.authorText': 'Authors - Pea and Friends',
+    'intro.telegram_channel': 'Telegram Channel',
     'intro.authorContacts': '<img src="./img/telegram.svg" style="vertical-align:middle;height:40px">&nbsp;<a href="//t.me/antieden">Telegram</a><br>'+
     '<img src="./img/discord-logo-circle.svg" style="vertical-align:middle;height:40px">&nbsp;goeden<br>'+
-    '<img src="./img/discord-logo-circle.svg" style="vertical-align:middle;height:40px">&nbsp;<a href="//discord.gg/FeBMmwRUpA">Game server</a>',
+    '<img src="./img/discord-logo-circle.svg" style="vertical-align:middle;height:40px">&nbsp;<a href="//discord.gg/FeBMmwRUpA">Game Server</a>',
+    'intro.my_boosty': 'My Boosty:',
     // nsfw modal
     'WARNING': 'WARNING',
-    'This canvas may contain illustrations, inappropriate for people under age of 18, including:': 'This canvas may contain illustrations, inappropriate for people under age of 18, including:',
-    'Gore, furry, porn, hate, anime and all possible variations of these.': 'Gore, furry, porn, hate, anime and all possible variations of these.',
-    'Are you 18 y.o. and fully understanding what are you doing?': 'Are you 18 y.o. and fully understanding what are you doing?',
-    'I am 18 years old and I take responsibility for my psyche on myself': 'I am 18 years old and I take responsibility for my psyche on myself',	
+    'This canvas may contain illustrations, inappropriate for people under age of 18, including:': 'This canvas may contain images inappropriate for people under 18, including but not limited to:',
+    'Gore, furry, porn, hate, anime and all possible variations of these.': 'Gore, furry, porn, hate, anime, and all possible variations of these.',
+    'Are you 18 y.o. and fully understanding what are you doing?': 'Are you 18 and fully understand what you’re doing?',
+    'I am 18 years old and I take responsibility for my psyche on myself': 'I am 18 years old and I take responsibility for my psyche on myself',
     // converter section
     // html
     'Convert!': 'Convert!',
     'Into palette': 'Into palette',
-    'GO!': 'GO!',
+    'GO!': 'For the Motherland!',
     'Dithering': 'Dithering',
-    'None': 'None',
+    'None': 'No dithering',
     'Floyd-Steinberg': 'Floyd-Steinberg',
-    'Stuсki': 'Stuсki',
+    'Stuсki': 'Stucki',
     'Chess': 'Chess',
     'Ordered (matrix)': 'Ordered (matrix)',
     'Threshold': 'Threshold',
@@ -1877,78 +2419,101 @@ __webpack_require__.r(__webpack_exports__);
     'Darken': 'Darken',
     'Lighten': 'Lighten',
     'Balance': 'Balance',
-    'Color function for ΔE': 'Color function for ΔE',
-    'RGB + luminance [very fast and dirty]': 'RGB + luminance [very fast and dirty]',
-    'ciede2000 [slow and accurate]': 'ciede2000 [slow and accurate]',
-    'CMC I:c [weird and slow]': 'CMC I:c [weird and slow]',
-    'Euclidian + color values [fast and dirty]': 'Euclidian + color values [fast and dirty]',
-    'brightness tune': 'brightness tune',
+    'Color function for ΔE': 'Additional color settings',
+    'RGB + luminance [very fast and dirty]': 'RGB + luminance [very fast, "dirty" image]',
+    'ciede2000 [slow and accurate]': 'ciede2000 [slow but accurate]',
+    'CMC I:c [weird and slow]': 'CMC I:c [weird and slow (but sometimes better than others)]',
+    'Euclidian + color values [fast and dirty]': 'Euclidean + color perception [fast, "dirty" image]',
+    'brightness tune': 'brightness adjustment',
     'reset': 'reset',
-    'constrast tune': 'constrast tune',
-    'resize preview automatically': 'resize preview automatically',
-    'serpentine (slightly suppresses dithering artefacts)': 'serpentine (slightly suppresses dithering artefacts)',
-    'Into patterns': 'Into patterns',
+    'constrast tune': 'contrast adjustment',
+    'zoom preview automatically': 'auto-scale preview',
+    'serpentine (slightly suppresses dithering artefacts)': 'serpentine (slightly suppresses dithering artifacts)',
+    'Into patterns': 'Convert to patterns',
     'Choose a palette': 'Choose a palette',
+    'resize': 'resize',
+    'width': 'Width',
+    'height': 'Height',
+    'anti-alias': 'anti-aliasing',
+    'tryResizePixelArt': 'try to resize pixel art',
+    'doNOTconvert': 'DO NOT convert',
+    'onDone.didNotConvert': 'As you requested, DID NOT convert',
+    'warn.notPixelArt': '10/10 jackals, pixel art NOT FOUND (not original)',
+
     // js and others
-    'Image is loaded, but pixels can not be gotten. Try to load it on Imgur or download->upload from file': 'Image is loaded, but pixels can not be gotten. Try to load it on Imgur or download->upload from file',
+    'Image is loaded, but pixels can not be gotten. Try to load it on Imgur or download->upload from file': 'Image is loaded, but pixels cannot be retrieved. Try uploading it to Imgur or downloading -> uploading from a file',
     '[clipboard]': '[clipboard]',
-    'Choose a image!': 'Choose a image!',
+    '[file]': '[file]',
+    'Choose a image!': 'Choose an image!',
     'Invalid link!': 'Invalid link!',
     'Done in': 'Done in', //: Done in TIME ms
     'ms.': 'ms.', // milliseconds
     's.': 's.', // seconds
-    'Unknown image loading error. Maybe CORS, so try to upload on Imgur': 'Unknown image loading error. Maybe CORS, so try to upload on Imgur',
-    'If your image is big, go make a tea and watch Doctor Who': 'If your image is big, go make a tea and watch Doctor Who',
+    'Unknown image loading error. Maybe CORS, so try to upload on Imgur': 'Unknown image loading error. Maybe CORS, so try uploading to Imgur.',
+    'If your image is big, go make a tea and watch Doctor Who': 'If your image is large, be patient. Brew some tea and watch a couple of episodes of "Doctor Who".', // or episodes of "Bones" about maniacs, I recommend Pelant and the Puppeteer (John)
     'Final image size:': 'Final image size:',
-    'Upload on imgur!': 'Upload on imgur!',
-    'copy_canvas_btn': 'copy to Clipboard',
+    'Upload on imgur!': 'Upload to Imgur!',
+    'copy_canvas_btn': 'to clipboard',
     'download_canvas_btn': 'download',
-    'Imgur upload failed, try upload manually': 'Imgur upload failed, try upload manually',
+    'Imgur upload failed, try upload manually': 'Imgur upload failed. Try uploading manually and copy the link yourself',
     'insert_link_here': 'insert link here',
+    'imgur_album_link': 'That’s not the right link! Right-click on the image - "copy image link", or use the "Copy link" button',
     'Failed to load game palettes!': 'Failed to load game palettes!',
     'URL/file/clipboard': 'URL/file/clipboard',
 
     // admin section
     // html
-    'Backup Viewer': 'Backup Viewer',
+    'Backup Viewer': 'Backup Viewer', // backups (John)
     'SELECT CANVAS': 'SELECT CANVAS',
     'SELECT DAY': 'SELECT DAY',
     'SELECT TIME': 'SELECT TIME',
     'rollback': 'rollback',
     'Show chunk grid': 'Show chunk grid',
-    'Crop chunks from': 'Crop chunks from',
+    'Crop chunks from': 'Show only chunks from', // ? (John)
     'to': 'to',
     'Crop rollback too': 'Crop rollback too',
     'IP Actions': 'IP Actions',
     'Blacklist': 'Blacklist',
-	'Whitelist': 'Whitelist',
-    'UnBlackist': 'UnBlackist',
-    'UnWhitelist': 'UnWhitelist',
-    'send': 'send',
-    'set captchaEnabled state': 'set captchaEnabled state',
-    'set': 'set',
-    'set afterJoinDelay value': 'set afterJoinDelay value',
+    'UnBlackist': 'Remove from blacklist', // ? (John)
+    'Whitelist': 'Whitelist',
+    'UnWhitelist': 'Remove from whitelist',
+    'send': 'send', // and that’s a whole different story (John)
+    'set captchaEnabled state': 'enable captcha',
+    'set': 'set', // assign, set (John)
+    'set afterJoinDelay value': 'change afterJoinDelay', // as you requested (John)
     'Canvas Actions': 'Canvas Actions',
     'Canvas': 'Canvas',
     'DO': 'DO',
     'wipe': 'wipe',
-    'enlarge': 'enlarge',
+    'enlarge': 'enlarge', // used in the context of enlarging the canvas, as are the following lines? (John)
     'top': 'top',
     'right': 'right',
     'bottom': 'bottom',
     'left': 'left',
     // js and others TODO
     'LOG IN': 'LOG IN',
-    
+
+    // templates update MAIN
+    'btn_show_templates': 'all templates',
+    'btn_add_template': 'add template',
+    'btn_share_template': 'share your template',
+    // templates update CONVERT
+    'you_need_login_to_use_this_feature': 'To use it, you need to be logged in',
+    'template_name_shit': 'Template name must be 3-32 characters long',
+    'upload_to_goroxels': 'Upload to Goroxels',
+    'template_patternize': 'turn into patterns?',
+    'template_is_public': 'make public?',
+    'template_name_desc': 'Template name (3-32 characters)',
+    'img_copied_success': 'Copied to clipboard!',
 });
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/translates/ru.js":
+/***/ "./src/js/translates/ru.js"
 /*!*********************************!*\
   !*** ./src/js/translates/ru.js ***!
   \*********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -1995,7 +2560,24 @@ __webpack_require__.r(__webpack_exports__);
     'time.hour': 'Час',
     'time.day': 'День',
 
-    
+    // gradient miniwindow
+    'gradient': 'Градиент',
+    'fill_mode.global': 'глобально',
+    'fill_mode.floodfill': 'заливкой',
+    'bayer': 'матрица',
+    'radial': 'радиальный',
+    'magnet_mode': 'магнит',
+
+    // double palette notif
+    'change_palette': 'Сменить активную палитру',
+    'select_palette_title': 'Выбери палитру',
+    'have_you_seen_pal_update_title': 'Ходят слухи, что...',
+    'have_you_seen_pal_update_body': 'Теперь на сайте аж две палитры!',
+    'show_me_palette_update': 'Покажи!!!',
+
+    // palette hotkey notif
+    'psst': 'псс...',
+    'use_p_to_swap_palette': 'Чтобы быстро сменить палитру, нажми H',
     
     'socketErr.banned': 'Вы были забанены. Если вы считаете, что это ошибка, свяжитесь с администрацией (telegram/discord есть в Help)',
     'socketErr.bannedUntil': `Вы были временно забанены. До снятия бана: `,
@@ -2033,14 +2615,17 @@ __webpack_require__.r(__webpack_exports__);
     'toolName.copy': 'копировать',
     'toolName.paste': 'вставка',
     'toolName.coords to chat': 'отправить коорд. в чат',
-    'toolName.template 0/N opaq': 'прозрачность шаблоны 0/N',
-    'toolName.template 1/N opaq': 'прозрачность шаблоны 1/N',
+    'toolName.template 0/N opaq': 'прозрачность шаблона 0/N',
+    'toolName.template 1/N opaq': 'прозрачность шаблона 1/N',
     'toolName.square': 'прямоугольник',
     'toolName.+brush size': 'размер кисти +',
     'toolName.-brush size': 'размер кисти -',
     'toolName.pixel info': 'кто поставил пиксель',
     'toolName.text': 'нарисовать текст',
     'toolName.reset colors': 'отменить выбор цвета',
+    'toolName.wand': 'Волшебная палочка',
+    'toolName.colorador': 'МНКБМ',
+    'toolName.palette_swap': 'Сменить палитру',
 	
     // end tools subsection
     'colors size': 'размер цветов', // увеличивает квадраты цветов, находящихся в палитре -> увеличивает палитру (Джон)
@@ -2136,6 +2721,7 @@ __webpack_require__.r(__webpack_exports__);
     'CMC I:c [weird and slow]': 'CMC I:c [всрато и медленно(но иногда лучше других)]',
     'Euclidian + color values [fast and dirty]': 'Евклид + значения восприятия [быстро, "грязная" картинка]',
     'brightness tune': 'регулировка яркости',
+    'bayer_strength': 'сила матрицы💪',
     'reset': 'сброс',
     'constrast tune': 'регулировка контраста',
     'zoom preview automatically': 'автоматически масштабировать превью',
@@ -2209,6 +2795,7 @@ __webpack_require__.r(__webpack_exports__);
     'btn_add_template': 'добавить шаблон',
     'btn_share_template': 'поделиться своим шаблоном',
     // templates update CONVERT
+    'you_need_login_to_use_this_feature': 'Чтобы это использовать, войди в аккаунт',
     'template_name_shit': 'Имя шаблона должно быть 3-32 символов длиной',
     'upload_to_goroxels': 'Загрузить на Goroxels',
     'template_patternize': 'превратить в узоры?',
@@ -2219,13 +2806,13 @@ __webpack_require__.r(__webpack_exports__);
 
 });
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/ui/elements.js":
+/***/ "./src/js/ui/elements.js"
 /*!*******************************!*\
   !*** ./src/js/ui/elements.js ***!
   \*******************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -2280,13 +2867,13 @@ function changeSelector(selector, obj) {
     document.head.appendChild(el);
 }
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/utils/api.js":
+/***/ "./src/js/utils/api.js"
 /*!*****************************!*\
   !*** ./src/js/utils/api.js ***!
   \*****************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -2361,19 +2948,20 @@ async function solveCaptcha(answer) {
 
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/utils/color.js":
+/***/ "./src/js/utils/color.js"
 /*!*******************************!*\
   !*** ./src/js/utils/color.js ***!
   \*******************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   applyColor: () => (/* binding */ applyColor),
 /* harmony export */   closestColor: () => (/* binding */ closestColor),
+/* harmony export */   eq: () => (/* binding */ eq),
 /* harmony export */   getPaletteColorId: () => (/* binding */ getPaletteColorId),
 /* harmony export */   isDarkColor: () => (/* binding */ isDarkColor),
 /* harmony export */   rgb2abgr: () => (/* binding */ rgb2abgr),
@@ -2409,11 +2997,11 @@ function applyColor(origColor, tintColor) {
     ];
 }
 
-function closestColor(rgb, palette){
+function closestColor(rgb, palette) {
     let colorId = -1;
     let score = 768; // 255 + 255 + 255
 
-    for(let i = 0; i < palette.length; i++){
+    for (let i = 0; i < palette.length; i++) {
         const item = palette[i];
 
         let scrnow = Math.abs(rgb[0] - item[0]) + Math.abs(rgb[1] - item[1]) + Math.abs(rgb[2] - item[2]);
@@ -2422,29 +3010,39 @@ function closestColor(rgb, palette){
             colorId = i;
         }
 
-        if(scrnow == 0) break;
+        if (scrnow == 0) break;
     }
     return colorId;
 }
 
-function getPaletteColorId(color){
-    return _config__WEBPACK_IMPORTED_MODULE_0__.palette.findIndex(palCol => {
-        return palCol[0] === color[0] && palCol[1] === color[1] && palCol[2] === color[2];
-    });
+function getPaletteColorId(color) {
+    // if we're using one of multiple palettes, 
+    // try to find the color in this palette first
+    if(_config__WEBPACK_IMPORTED_MODULE_0__.currentPalette){
+        const startIdx = _config__WEBPACK_IMPORTED_MODULE_0__.currentPalette.slice[0];
+        
+        const colIdx = _config__WEBPACK_IMPORTED_MODULE_0__.currentPaletteColors.findIndex(palCol => eq(palCol, color));
+        if(colIdx !== -1) return startIdx + colIdx;
+    }
+    return _config__WEBPACK_IMPORTED_MODULE_0__.allColors.findIndex(palCol => eq(palCol, color));
 }
 
-function isDarkColor(r, g, b){
-    const darkness = 1-(0.299*r + 0.587*g + 0.114*b)/255;
+function isDarkColor(r, g, b) {
+    const darkness = 1 - (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return darkness > 0.5;
 }
 
-/***/ }),
+function eq(col1, col2) {
+    return col1[0] === col2[0] && col1[1] === col2[1] && col1[2] === col2[2];
+}
 
-/***/ "./src/js/utils/localStorage.js":
+/***/ },
+
+/***/ "./src/js/utils/localStorage.js"
 /*!**************************************!*\
   !*** ./src/js/utils/localStorage.js ***!
   \**************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -2499,13 +3097,13 @@ function removeOldKeybinds() {
     } catch { }
 }
 
-/***/ }),
+/***/ },
 
-/***/ "./src/js/utils/misc.js":
+/***/ "./src/js/utils/misc.js"
 /*!******************************!*\
   !*** ./src/js/utils/misc.js ***!
   \******************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
@@ -2521,7 +3119,6 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   insanelyLongMobileBrowserCheck: () => (/* binding */ insanelyLongMobileBrowserCheck),
 /* harmony export */   isClick: () => (/* binding */ isClick),
 /* harmony export */   loadImage: () => (/* binding */ loadImage),
-/* harmony export */   makeScreenshot: () => (/* binding */ makeScreenshot),
 /* harmony export */   resizeCanvas: () => (/* binding */ resizeCanvas),
 /* harmony export */   reverseFade: () => (/* binding */ reverseFade),
 /* harmony export */   sleep: () => (/* binding */ sleep),
@@ -2747,15 +3344,6 @@ function reverseFade(el) {
     return clear;
 }
 
-function makeScreenshot() {
-    const canvas = _globals__WEBPACK_IMPORTED_MODULE_1__["default"].chunkManager.dumpAll();
-
-    const link = document.createElement('a');
-    link.download = `GX ${_config__WEBPACK_IMPORTED_MODULE_0__.canvasName} ${getPathsafeDate()}.png`;
-    link.href = canvas.toDataURL()
-    link.click();
-}
-
 async function sleep(ms) {
     return new Promise(res => setTimeout(res, ms));
 }
@@ -2766,7 +3354,7 @@ function isClick(downPos, upPos, threshold=5){
         Math.abs(downPos[1] - upPos[1]) < threshold;
 }
 
-/***/ })
+/***/ }
 
 }]);
-//# sourceMappingURL=penis.81f58040c300350f7fd5.bundle.js.map
+//# sourceMappingURL=penis.84b3f08c8f453fc8fb7b.bundle.js.map
