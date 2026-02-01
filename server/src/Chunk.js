@@ -5,55 +5,55 @@ const logger = require('./logger')('CHUNK');
 
 _anus = []
 
-class Chunk{
-    constructor(x, y, size, data, canvasId){
+class Chunk {
+    constructor(x, y, size, data, canvasId) {
         this.x = x;
         this.y = y;
 
         this.size = size;
 
         this.data = data;
-        
+
         // for compression
         this.__needUpdate = true;
-        
+
         this.compressed = null;
         this.compressedHash = null;
-        
+
         // for saves (to file)
         this.__needToSave = false;
         // for backups
         this.__needBackup = false;
-        
+
         // to update everything
         this._updLatch = false;
 
         this.placeInfo = new ChunkPlaceInfo(canvasId, this);
     }
-    
-    resetUpdLatch(){
+
+    resetUpdLatch() {
         this._updLatch = false;
     }
-    
+
     // this looks so ugly! :D
-    get _needToSave(){ return this.__needToSave }
-    set _needToSave(value){
+    get _needToSave() { return this.__needToSave }
+    set _needToSave(value) {
         this.__needToSave = value;
-        if(!value) this.resetUpdLatch();
+        if (!value) this.resetUpdLatch();
     }
-    get _needBackup(){ return this.__needBackup }
-    set _needBackup(value){
+    get _needBackup() { return this.__needBackup }
+    set _needBackup(value) {
         this.__needBackup = value;
-        if(!value) this.resetUpdLatch();
+        if (!value) this.resetUpdLatch();
     }
-    get _needUpdate(){ return this.__needUpdate }
-    set _needUpdate(value){
+    get _needUpdate() { return this.__needUpdate }
+    set _needUpdate(value) {
         this.__needUpdate = value;
-        if(!value) this.resetUpdLatch();
+        if (!value) this.resetUpdLatch();
     }
 
-    upd(){
-        if(!this._updLatch){
+    upd() {
+        if (!this._updLatch) {
             this._needUpdate = true;
             this._needToSave = true;
             this._needBackup = true;
@@ -61,34 +61,63 @@ class Chunk{
         }
     }
 
-    get(x, y){
+    get(x, y) {
         return this.data[x + y * this.size]
     }
 
-    set(x, y, c){
+    set(x, y, c, noBackup = false) {
         const i = x + y * this.size;
 
         this.data[i] = (this.data[i] & 0x80) + c;
+
         this.upd();
+
+        if (noBackup) this._needBackup = false;
+    }
+
+    // avoiding `set` calls for really large batches
+    setBulk(pixels, noBackup = false) {
+        if(pixels instanceof DataView){
+            for(let offset = 0; offset < pixels.length; offset += 5){
+                const x = pixels.getUint16(offset, false);
+                const y = pixels.getUint16(offset + 2, false);
+                const c = pixels.getUint8(offset + 4);
+
+                const i = x + y * this.size;
+
+                this.data[i] = (this.data[i] & 0x80) + c;
+            }
+        }else{
+            for (const [x, y, c] of pixels) {
+                const i = x + y * this.size;
+    
+                this.data[i] = (this.data[i] & 0x80) + c;
+            }            
+        }
+        this.upd();
+
+        if (noBackup) this._needBackup = false;
     }
 
     // the same as above, but with protection overwrite
-    setP(x, y, c){
+    setP(x, y, c, noBackup = false) {
         const i = x + y * this.size;
 
         this.data[i] = c;
         this.upd();
+
+        if (noBackup) this._needBackup = false;
     }
 
-    setBuffer(buffer){
-        for(let i = 0; i < this.data.length; i++){
+    setBuffer(buffer) {
+        for (let i = 0; i < this.data.length; i++) {
             // protection is overwritten!
             this.data[i] = buffer[i];
         }
         this.upd();
     }
 
-    setProtection(x, y, state){
+    setProtection(x, y, state) {
         const i = x + y * this.size
         const col = this.data[i];
 
@@ -96,18 +125,18 @@ class Chunk{
         this.upd();
     }
 
-    async compress(){
-        if(this._needUpdate){
+    async compress() {
+        if (this._needUpdate) {
             this._needUpdate = false;
 
             return new Promise((res, rej) => {
                 zlib.deflate(this.data, (err, result) => {
-                    if(err) return rej(err);
+                    if (err) return rej(err);
 
                     const chunkhash = sha256(result, 8);
                     this.compressedHash = chunkhash;
 
-                    res(this.compressed=result);
+                    res(this.compressed = result);
                 });
             })
         }
@@ -115,17 +144,17 @@ class Chunk{
         return this.compressed
     }
 
-    wipe(){
+    wipe() {
         this.data = Chunk.createEmpty(this.size);
         this.placeInfo.initEmpty();
         this.upd();
     }
 
-    clone(){
+    clone() {
         return new Chunk(this.x, this.y, this.size, new Uint8Array(this.data));
     }
-    
-    getChunkKey(){
+
+    getChunkKey() {
         return this.x << 16 | this.y
     }
 }

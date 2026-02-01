@@ -1,38 +1,32 @@
-const logger = require('./logger')('WEBSOCKET', 'debug');
+const zlib = require('zlib');
 
-const {
-    Server: WebSocketServer,
-} = require('ws');
-
+const ms = require('ms');
 const WebSocket = require('ws');
+const { Server: WebSocketServer } = require('ws');
 
-const {
-    Client,
-} = require('./Client');
+const logger = require('./logger')('WEBSOCKET', 'debug');
+const config = require('./config');
+
+const { MAX_CLIENTS_PER_IP } = require('./config');
+const { ROLE, ROLE_I, MINUTE, chatBucket } = require('./constants');
+
+const { Client } = require('./Client');
 const Bucket = require('./Bucket');
 const ChatChannel = require('./ChatChannel');
+
 const {
     OPCODES,
     STRING_OPCODES,
     createPacket,
-    createStringPacket
+    createStringPacket,
 } = require('./protocol');
-const {
-    unpackPixel
-} = require('./utils');
-const {
-    MAX_CLIENTS_PER_IP
-} = require('./config');
-const { ROLE, ROLE_I, MINUTE, chatBucket } = require('./constants');
-const { needCaptcha } = require('./captcha');
-const { getIPFromRequest, getIPv6Subnet, ipToInt } = require('./utils/ip');
-const config = require('./config');
+
 const { checkCanvasConditions } = require('./utils/canvas');
 const { checkRole } = require('./utils/role');
-const ChatMessage = require('./ChatMessage');
-const ms = require('ms');
+const { getIPFromRequest, getIPv6Subnet, ipToInt } = require('./utils/ip');
 
-const ipConns = {};
+const { needCaptcha } = require('./captcha');
+
 
 let instance = null;
 
@@ -49,6 +43,7 @@ function writeInvalidPixel(buffer, i) {
     buffer.writeUInt16BE(0xffff, i);
     buffer.writeUInt16BE(0xffff, i + 2);
 }
+
 
 class Server {
     /**
@@ -82,6 +77,7 @@ class Server {
         // motd can be set through console command
         this.MOTD = null;
 
+
         setInterval(this.updateOnlineStats.bind(this), 10000);
     }
 
@@ -97,7 +93,7 @@ class Server {
 
         const wss = new WebSocketServer({
             noServer: true,
-            maxPayload: 262175
+            maxPayload: /*262175*/250 * 250 * 5 + 6
         });
 
         this.channels.global = new ChatChannel('global');
@@ -115,9 +111,11 @@ class Server {
                 maxOffset: bufferLimit - pixelSize,
                 // extra 1 is for OP
                 buffer: Buffer.alloc(bufferLimit + 1),
-                curOffset: 0
+                curOffset: 0,
+
+                interval: null
             });
-            this.initPixelQueueBroadcastInterval(canvas);
+            this.startOrRestartPixelQueueBroadcastInterval(canvas);
         })
 
         wss.on('connection', (socket, request, user) => {
@@ -185,6 +183,9 @@ class Server {
             if (needCaptcha(client.ip, client)) {
                 client.sendCaptcha();
             }
+
+            // this will also make the client knowing how much his network delay is
+            client.ping();
         });
         wss.on('error', err => {
             logger.error(err);
@@ -194,20 +195,23 @@ class Server {
         setInterval(this.ping.bind(this), 45000);
     }
 
-    initPixelQueueBroadcastInterval(canvas) {
+    // sometimes we may need to change interval delay
+    startOrRestartPixelQueueBroadcastInterval(canvas, intervalDelay = Server.PIXEL_SEND_INTERVAL) {
         const objPixelQueueRef = this.broadcastPixelQueue.get(canvas);
 
         // this byte is never changed later and writer preserves it
         objPixelQueueRef.buffer.writeUint8(OPCODES.placeBatch, 0);
 
-        setInterval(() => {
+        clearInterval(objPixelQueueRef.interval);
+        objPixelQueueRef.interval = setInterval(() => {
             if (objPixelQueueRef.curOffset) {
                 let subBuffer = objPixelQueueRef.buffer.subarray(0, objPixelQueueRef.curOffset + 1);
                 this.broadcastForCanvasFast(canvas, subBuffer);
                 objPixelQueueRef.curOffset = 0;
             }
-        }, Server.PIXEL_SEND_INTERVAL);
+        }, intervalDelay);
     }
+
 
     initOnlineBroadcast() {
         // todo
@@ -250,9 +254,9 @@ class Server {
     }
 
     onmessage(client, ev) {
-        // TODO: replace it with more effective
-        // event type check
         if (ev.type !== 'message') return;
+
+        client.isAlive = true;
 
         let message = ev.data;
 
@@ -294,7 +298,7 @@ class Server {
                 }
 
                 function send() {
-                    chunkManager.getChunkData(cx, cy).then(chunkData => {
+                    chunkManager.getChunkData(cx, cy).then(([chunkData]) => {
                         client.send(createPacket.chunkSend(cx, cy, chunkData));
                     });
                 }
@@ -371,6 +375,7 @@ class Server {
                 }
 
                 const isTrusted = ROLE[client.user.role] >= ROLE.TRUSTED;
+                const isApiSocket = client.user.isApiSocket;
 
                 const {
                     realWidth, realHeight
@@ -384,10 +389,15 @@ class Server {
                 }
                 client.bucket.spend(pxlsCount);
 
+                // tests revealed that dataView is faster
+                // than readXXX functions of the buffer 
+                // (second one uses bound checks/validations)
+                // this is critical for really large batches
+                const fastBuf = new DataView(message.buffer, message.byteOffset, message.byteLength);
                 for (let i = 6; i < message.length; i += 5) {
-                    const x = message.readUInt16BE(i);
-                    const y = message.readUInt16BE(i + 2);
-                    const clr = message.readUInt8(i + 4);
+                    const x = fastBuf.getUint16(i, false);
+                    const y = fastBuf.getUint16(i + 2, false);
+                    const clr = fastBuf.getUint8(i + 4);
 
 
                     if (clr < 0 || clr > maxClrId) {
@@ -406,17 +416,17 @@ class Server {
                         }
                     }
 
-                    if (isProtect) {
+                    if (isProtect && isTrusted) {
                         client.canvas.chunkManager.setPixelProtected(x, y, clr);
                     } else {
-                        client.canvas.chunkManager.setChunkPixel(x, y, clr);
+                        client.canvas.chunkManager.setChunkPixel(x, y, clr, !isApiSocket); // <-- do not backup apisocket pixels
                         client.canvas.chunkManager.setPlacerDataRaw(x, y, client.placeInfoFlag, client.placeInfoNumber);
                     }
 
 
                 }
 
-                if (!client.user.isApiSocket) message.writeUInt32BE(client.id, 2);
+                if (!isApiSocket) message.writeUInt32BE(client.id, 2);
 
                 this.broadcastForCanvasFast(client.canvas, message);
 
@@ -456,6 +466,38 @@ class Server {
 
                 break
             }
+
+            // only for apisocket for the moment
+            // note: THIS IS TEMPORARY
+            case OPCODES.pastePixels: {
+                if (!client.user.isApiSocket) return;
+
+                const startX = message.readUInt16BE(1);
+                const startY = message.readUInt16BE(3);
+                const width = message.readUInt16BE(5);
+
+
+                zlib.inflate(message.slice(7), (err, result) => {
+                    if (err) {
+                        logger.error(`pastePixels deflate error: ${err.message}`);
+                        return;
+                    }
+
+                    const u8a = new Uint8Array(result);
+
+                    for (let i = 0; i < u8a.length; i++) {
+                        const posX = startX + (i % width);
+                        const posY = startY + Math.floor(i / width);
+
+                        const col = u8a[i];
+
+                        client.canvas.chunkManager.setChunkPixel(posX, posY, col);
+                    }
+                });
+
+                this.broadcastForCanvasFast(client.canvas, message);
+            }
+
             case OPCODES.ping: {
                 client.emit('pong');
                 break;
@@ -596,8 +638,16 @@ class Server {
 
                 break
             }
+            // temporary
+            case 'transmit': {
+                if (!client.user.isApiSocket) return;
+
+                this.broadcastString(JSON.stringify(msg), c => c.canvas.id === msg.canvas);
+                break;
+            }
         }
     }
+
 
     broadcastOnline() {
         let online = [...this.clients.values()].reduce((s, c) => c.canvas ? s + 1 : s, 0);
@@ -621,20 +671,19 @@ class Server {
             fin: true,
         });
 
+        const toSend = Buffer.concat(frame);
+
         this.clients.forEach(client => {
             if (client.canvas !== canvas) {
                 return
             }
 
-            const ws = client.socket;
 
-            frame.forEach((buffer) => {
-                try {
-                    ws._socket.write(buffer);
-                } catch (error) {
-                    logger.error(`WebSocket broadcast error: ${error.message}`);
-                }
-            });
+            try {
+                client.socket._socket.write(toSend);
+            } catch (error) {
+                logger.error(`WebSocket broadcast error: ${error.message}`);
+            }
         });
     }
 
@@ -668,6 +717,7 @@ class Server {
         ch.getMessages().forEach(msg => {
             message.nick = msg.name;
             message.msg = msg.message;
+            message.time = msg.time;
             message.server = msg.isServer;
 
             client.send(JSON.stringify(message));

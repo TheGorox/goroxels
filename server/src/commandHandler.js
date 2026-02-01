@@ -1,3 +1,5 @@
+// this one is for console commands
+
 const readline = require('readline');
 const Server = require('./WebsocketServer');
 const logger = require('./logger')('COMMANDS');
@@ -109,6 +111,32 @@ function handleCommand(command, args){
 
             logger.info('Set motd to ' + message);
             break
+        }
+        // change pixel broadcasting interval for the canvas
+        // (resets after server reload)
+        case 'INTERVAL': {
+            if(args.length === 0){
+                logger.error('usage: INTERVAL canvas [delay]');
+            }
+
+            
+            let interval;
+            if(args.length > 1){
+                interval = parseInt(args[1], 10);
+                logger.info(`setting interval to ${interval}`);
+            }else{
+                interval = Server.PIXEL_SEND_INTERVAL;
+                logger.info(`setting interval to DEFAULT (${interval})`);
+            }
+            
+            const servInst = Server.getInstance();
+
+            const canvasId = parseInt(args[0], 10);
+            const canvas = servInst.canvases[canvasId];
+
+            servInst.startOrRestartPixelQueueBroadcastInterval(canvas, interval);
+
+            logger.info('Done!');
         }
     }
 }

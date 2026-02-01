@@ -1,5 +1,5 @@
 
-const publicConfig = require('../data/config.json');
+const publicConfig = require('../../shared/config.js');
 
 const config = {
     port: 80,

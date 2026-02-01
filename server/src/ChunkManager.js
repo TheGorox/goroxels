@@ -327,11 +327,14 @@ class ChunkManager extends EventEmitter {
         return [x % this.chunkSize, y % this.chunkSize]
     }
 
-    setChunkPixel(x, y, c) {
-        this.needToBackup = true;
+    setChunkPixel(x, y, c, needBackup=true) {
+        this.needToBackup = needBackup;
 
         const key = this.getChunkKey(...this.cordToChunk(x, y));
-        this.chunks[key].set(x % this.chunkSize, y % this.chunkSize, c)
+        this.chunks[key].set(x % this.chunkSize, y % this.chunkSize, c, !needBackup)
+    }
+    setChunkPixels(){
+        
     }
 
     getChunkPixel(x, y) {

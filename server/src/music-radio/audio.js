@@ -3,24 +3,21 @@ const fsp = require('fs/promises');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnWithPipe, checkBounds, GetAudioError, ffprobeTempfile } = require('./util');
-const { pcmPath, tempPcmPath, infoPath } = require('./paths');
+const { mp3Path, tempMp3Path, infoPath } = require('./paths');
 
 const logger = require('../logger')('RADIO', 'info');
 
-// const pcmPath = path.join(__dirname, '../../data/radio/pcm');
-// const tempPcmPath = path.join(__dirname, '../../data/radio/temp');
-// const infoPath = path.join(__dirname, '../../data/radio/info');
 
-if (!fs.existsSync(pcmPath)) {
-    logger.info('PCM path not exists, creating');
+if (!fs.existsSync(mp3Path)) {
+    logger.info('MP3 path not exists, creating');
 
-    fs.mkdirSync(pcmPath, { recursive: true });
+    fs.mkdirSync(mp3Path, { recursive: true });
 }
 
-if (!fs.existsSync(tempPcmPath)) {
-    logger.info('Temp PCM path not exists, creating');
+if (!fs.existsSync(tempMp3Path)) {
+    logger.info('Temp MP3 path not exists, creating');
 
-    fs.mkdirSync(tempPcmPath, { recursive: true });
+    fs.mkdirSync(tempMp3Path, { recursive: true });
 }
 
 if (!fs.existsSync(infoPath)) {
@@ -39,7 +36,7 @@ function getHash(buffer) {
 }
 
 async function checkIsAdded(songHash) {
-    return fs.existsSync(path.join(pcmPath, songHash))
+    return fs.existsSync(path.join(mp3Path, songHash))
 }
 
 async function getSavedSongInfo(songHash) {
@@ -54,8 +51,8 @@ async function getSavedSongInfo(songHash) {
 }
 
 function getSongStream(songHash, isTempSong) {
-    const songPcmPath = path.join((isTempSong ? tempPcmPath : pcmPath), songHash);
-    const stream = fs.createReadStream(songPcmPath);
+    const songMp3Path = path.join((isTempSong ? tempMp3Path : mp3Path), songHash);
+    const stream = fs.createReadStream(songMp3Path);
     return stream
 }
 
@@ -114,29 +111,19 @@ async function ffprobe_getAudioInfo(audioBuffer, audioFileName) {
     return sanProps;
 }
 
-async function addPcm(songBuffer, songInfo) {
+async function addMp3(songBuffer, songInfo) {
     const { isOneTime, hash } = songInfo;
 
-    const outPath = path.join((isOneTime ? tempPcmPath : pcmPath), hash);
+    const outPath = path.join((isOneTime ? tempMp3Path : mp3Path), hash);
 
-    await spawnWithPipe('ffmpeg', [
-        '-i', 'pipe:0',
-        '-f', 's16le', // output format (signed 16bit little endian)
-        '-ar', songInfo.sampleRate.toString(), // sample rate
-        '-ac', '2', // number of channels (fixed 2)
-        '-acodec', 'pcm_s16le', // set audio codec (again)
-        '-v', 'quiet',
-        '-hide_banner',
-        '-y', // override existing file (though it should not be ever encountered)
-        outPath
-    ], songBuffer);
+    await fsp.writeFile(outPath, songBuffer);
 }
 
-async function delPcm(songHash, isTemp){
-    const pcmFilePath = path.join(isTemp ? tempPcmPath : pcmPath, songHash);
+async function delMp3(songHash, isTemp){
+    const mp3FilePath = path.join(isTemp ? tempMp3Path : mp3Path, songHash);
     
     // unlink and rm does not work ...
-    await spawnWithPipe('rm', [pcmFilePath], null);
+    await spawnWithPipe('rm', [mp3FilePath], null);
 }
 
 async function cliRm(){
@@ -146,7 +133,7 @@ async function cliRm(){
 async function clearTemp() {
     logger.info('Clearing temp folder...');
 
-    const files = fs.readdirSync(tempPcmPath).map((p) => path.join(tempPcmPath, p));
+    const files = fs.readdirSync(tempMp3Path).map((p) => path.join(tempMp3Path, p));
     for (let file of files) {
         try {
             await fsp.unlink(file);
@@ -161,7 +148,7 @@ module.exports = {
     getHash,
     getSavedSongInfo,
     ffprobe_getAudioInfo,
-    addPcm,
-    delPcm,
+    addMp3,
+    delMp3,
     getSongStream
 }

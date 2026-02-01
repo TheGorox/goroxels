@@ -12,7 +12,8 @@ const OPCODES = {
     captcha:     0x5,
     ping:        0x6,
     placeBatch:  0x7,
-    updateRadio: 0x8
+    updateRadio: 0x8,
+    pastePixels: 0x9
 }
 
 const STRING_OPCODES = {
@@ -32,6 +33,7 @@ const createPacket = {
         // Warning: max x/y cord is 0xFF=255
         // to increase, change data type from uint8 to uint16 (offsets too)
         // btw max canvas coord is 4095, as designed at packPixel()
+        // upd: modified to 8192
         const buf = Buffer.allocUnsafe(1 + 1 + 1 + compressedData.byteLength);
         buf.writeUInt8(OPCODES.chunk, 0);
         buf.writeUInt8(x, 1);
@@ -110,6 +112,7 @@ const createStringPacket = {
             c: STRING_OPCODES.chatMessage,
             nick: message.name,
             msg: message.message,
+            time: message.time,
             server: message.isServer,
             ch: channel
         }

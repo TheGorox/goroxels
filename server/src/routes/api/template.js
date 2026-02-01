@@ -40,9 +40,11 @@ function isSafePngFileName(name) {
     return /^[0-9a-f]{16,32}\.png$/.test(name);
 }
 
+const limiter = rateLimiter.byUserId({ time: 60 * 1000, max: 5 });
+
 router.post(
     '/add',
-    rateLimiter.byUserId({ time: 60 * 1000, max: 5 }),
+    limiter,
     upload.fields([
         { name: 'thumb', maxCount: 1 },
         { name: 'pattern', maxCount: 1 },
@@ -134,6 +136,7 @@ router.post(
 
 router.post(
     '/del',
+    limiter,
     [query('name').isString().isLength({ min: 3, max: 32 }).escape()],
     async (req, res) => {
         const result = validationResult(req);
@@ -169,6 +172,7 @@ router.post(
 
 router.get(
     '/list',
+    limiter,
     [query('self').optional().isBoolean()],
     async (req, res) => {
         try {
@@ -216,10 +220,12 @@ router.get(
             return res.json({ errors: result.array() });
         }
 
+
         const type = req.query.t;
+        const isThumbnail = type === 'thumb';
         const fileName = req.query.f;
 
-        const dir = type === 'thumb' ? thumbnailsPath : patternsPath;
+        const dir = isThumbnail ? thumbnailsPath : patternsPath;
         const filePath = path.join(dir, fileName);
 
         if (!fs.existsSync(filePath)) {
@@ -236,8 +242,10 @@ router.get(
             return error(res, 'error reading image');
         }
 
-        res.setHeader('Cache-Control', 'private, max-age=86400'); // 24 hours
-        res.setHeader('Expires', new Date(Date.now() + 86400000).toUTCString());
+        if(isThumbnail){
+            res.setHeader('Cache-Control', 'private, max-age=3600'); // 1 hour
+            res.setHeader('Expires', new Date(Date.now() + 3600000).toUTCString());
+        }
         res.setHeader('Content-Type', 'image/png');
         
         fs.createReadStream(filePath).pipe(res);

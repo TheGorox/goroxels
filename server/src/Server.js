@@ -133,6 +133,8 @@ function startServer(port) {
 
     const webSocketServer = new Socket();
 
+
+    port = process.env.EXPRESS_PORT || port;
     logger.info('Listening http + websocket on port ' + port);
     server.listen(port);
 

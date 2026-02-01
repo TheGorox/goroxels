@@ -1,15 +1,16 @@
 require('../dotenv');
 
+const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const Song = require('../db/models/Song');
 const { Op } = require('sequelize');
-const { ffprobe_getAudioInfo, getHash, addPcm, getSongStream, delPcm } = require('./audio');
+const { ffprobe_getAudioInfo, getHash, addMp3, getSongStream, delMp3 } = require('./audio');
 const Throttle = require('throttle');
 const EventEmitter = require('events');
 const { SongExistsError, SongNotExistError, spawnWithPipe } = require('./util');
 const Server = require('../WebsocketServer');
-const { tempPcmPath, pcmPath } = require('./paths');
+const { tempMp3Path, mp3Path } = require('./paths');
 
 const logger = require('../logger')('RADIO', 'debug');
 
@@ -60,6 +61,11 @@ async function startBroadcasting(song) {
     playingSince = Date.now();
 
     broadcaster = createStreamForSong(song);
+    if(!broadcaster){
+        removeFromQueuesById(song.id);
+        skipSong();
+        return;
+    }
 
     let lastData = Date.now();
 
@@ -128,28 +134,26 @@ function killFfmpeg(proc) {
 function createStreamForSong(songInfo) {
     logger.debug("creating new stream");
 
-    const pcmFilePath = path.join(
-        songInfo.isOneTime ? tempPcmPath : pcmPath,
+    const mp3FilePath = path.join(
+        songInfo.isOneTime ? tempMp3Path : mp3Path,
         songInfo.hash
     );
 
-    // decoding raw pcm and encoding into aac 
+    if (!fs.existsSync(mp3FilePath)) {
+        console.log(mp3FilePath);
+        logger.warn(`song path (${songInfo.title}) not exists`);
+        return null;
+    }
+
     const args = [
         "-loglevel", "error",
         "-re",
-        "-f", "s16le",
-        "-ar", String(songInfo.sampleRate),
-        "-ac", "2",
-        "-i", pcmFilePath,
-
-        "-c:a", "aac", // codec
-        "-b:a", "128k",
-
-        "-f", "adts", // container
-
+        "-i", mp3FilePath,      
+        "-c:a", "aac",          // AAC codec
+        "-b:a", "128k",         // bitrate
+        "-f", "adts",           // container
         "pipe:1"
     ];
-
 
     const ff = (ffStreamProcess = spawn("ffmpeg", args));
 
@@ -177,6 +181,7 @@ function createStreamForSong(songInfo) {
 
     return ff.stdout;
 }
+
 
 
 
@@ -263,7 +268,7 @@ async function addOneTimeSong(songBuffer, fileName) {
         isOneTime: true
     }
 
-    await addPcm(songBuffer, sanInfo);
+    await addMp3(songBuffer, sanInfo);
 
     addToQueues(sanInfo, false);
 }
@@ -300,9 +305,9 @@ async function addSong(songBuffer, fileName, enqueue = false) {
     });
 
     try {
-        await addPcm(songBuffer, dbEntry);
+        await addMp3(songBuffer, dbEntry);
     } catch (error) {
-        logger.error(`Error adding/creating song's PCM (${fileName}):`);
+        logger.error(`Error adding/creating song's MP# (${fileName}):`);
         logger.error(error);
 
         // no need to .destroy it, since we didn't save it to db
@@ -360,7 +365,7 @@ async function skipSong() {
 }
 
 async function clearTempsongData(song) {
-    await delPcm(song.hash, true);
+    await delMp3(song.hash, true);
 }
 
 async function goNextSong() {
@@ -401,7 +406,7 @@ async function goNextSong() {
 
     if(_currentSong){
         clearTempsongData(_currentSong).catch(err => {
-            logger.error('Error clearing tempsong pcm data:');
+            logger.error('Error clearing tempsong mp3 data:');
             logger.error(err);
         });
     }
@@ -440,7 +445,7 @@ async function deleteByTitle(titlePart) {
     const song = songs[0];
 
     removeFromQueuesById(song.id);
-    await delPcm(song.hash, false);
+    await delMp3(song.hash, false);
     await song.destroy();
 }
 

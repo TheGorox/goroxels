@@ -15,12 +15,12 @@ const CLIENT_STATES = {
     READY: 2
 }
 
-class Client extends EventEmitter{
+class Client extends EventEmitter {
     static lastId = 0;
-    
-    constructor(socket){
+
+    constructor(socket) {
         super();
-        
+
         this.socket = socket;
         this.bucket = null;
 
@@ -47,53 +47,58 @@ class Client extends EventEmitter{
         })
     }
 
-    setCanvas(canvas){
+    setCanvas(canvas) {
         this.canvas = canvas;
     }
 
-    send(message){
+    send(message) {
         this.socket.send(message);
     }
 
-    sendError(message){
-        const str = JSON.stringify({c: STRING_OPCODES.error, errors: [message]});
+    sendError(message) {
+        const str = JSON.stringify({ c: STRING_OPCODES.error, errors: [message] });
         this.send(str);
     }
 
-    sendChatWarn(msg, channel){
+    sendChatWarn(msg, channel) {
         const chatMessage = new ChatMessage('', `[b][WARN] ${msg}[/b]`, true);
         const packet = createStringPacket.chatMessage(chatMessage, channel);
         this.send(JSON.stringify(packet));
     }
 
-    sendChat(name, msg, channel, isServer){
+    sendChat(name, msg, channel, isServer) {
         const chatMessage = new ChatMessage(name, msg, isServer);
         const packet = createStringPacket.chatMessage(chatMessage, channel);
         this.send(JSON.stringify(packet));
     }
 
-    sendCaptcha(){
+    sendCaptcha() {
         let buf = Buffer.allocUnsafe(1);
         buf.writeUInt8(OPCODES.captcha, 0);
 
         this.send(buf);
     }
 
-    kill(){
+    kill() {
         this.socket.close();
     }
 
-    ping(){
-        this.send(Buffer.from([OPCODES.ping]));
+    ping() {
+        const buf = Buffer.alloc(1 + 8);
+        buf.writeUint8(OPCODES.ping);
+        buf.writeBigUInt64BE(BigInt(Date.now()), 1);
+
+        this.send(buf);
+
         this._pingTime = Date.now();
     }
 
-    heartbeat(){
+    heartbeat() {
         this.isAlive = true;
     }
 }
 
-module.exports =  {
+module.exports = {
     Client,
     CLIENT_STATES
 }

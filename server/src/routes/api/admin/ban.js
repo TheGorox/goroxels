@@ -20,6 +20,7 @@ const { MINUTE } = require('../../../constants');
 const Server = require('../../../WebsocketServer');
 const { query, validationResult } = require('express-validator');
 const { User } = require('../../../db/models/User');
+const { ROLE } = require('../../../constants');
 
 const limiter = rateLimiter.byUserId({
     time: MINUTE * 10,
@@ -75,9 +76,6 @@ router.get('/',
 
         const targetUserId = req.query.uid;
 
-        if (req.user.id !== 1 && targetUserId === req.user.id) {
-            return error(res, 'you can\'t (un)ban yourself')
-        }
 
         const user = await User.findOne({
             where: {
@@ -86,8 +84,9 @@ router.get('/',
         });
         if (!user) return error(res, 'no such user');
 
-        if (user.role === 'ADMIN' && req.user.id !== 1)
-            return error(res, 'you can\'t ban admins');
+        if(!canBan(req.user, user)){
+            return res.error('Не по Сеньке шапка, или же другими словами иди нахуй');
+        }
 
         if (req.query.banned === false && user.role !== 'BANNED') {
             return;
@@ -131,6 +130,10 @@ router.get('/shadow',
         });
         if (!user) return res.error('no such user');
 
+        if(!canBan(req.user, user)){
+            return res.error('Не по Сеньке шапка, или же другими словами иди нахуй');
+        }
+
         user.shadowBanned = req.query.banned;
         if (req.query.until && req.query.banned) {
             user.bannedUntil = req.query.until;
@@ -156,6 +159,20 @@ router.get('/shadow',
                 errors: [error]
             });
         }
-    })
+    });
+
+function canBan(me, someUser) {
+    // superadmin
+    if(me.id === 1) return true;
+
+    // can't ban someone with bigger or exact role
+    if(ROLE[me.role] <= ROLE[someUser.role]){
+        return false;
+    }
+    // can't ban itself
+    if(me.id === someUser.id) return false;
+
+    return true;
+}
 
 module.exports = router

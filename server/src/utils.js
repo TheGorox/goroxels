@@ -16,6 +16,9 @@ function unpackPixel(num){
     ]
 }
 
+const INVALID_COORDINATE = 0xffff
+const INVALID_COLOR = 0xff;
+
 function splitByNewline(str){
     // crossplatform split
     return str.split('\r\n').join('\n').split('\n');
@@ -87,5 +90,8 @@ module.exports = {
     getFancyTime,
     randint,
 
-    savePublicConfig
+    savePublicConfig,
+
+    INVALID_COORDINATE,
+    INVALID_COLOR
 }

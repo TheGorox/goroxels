@@ -1,1 +1,1 @@
-rd /S /Q public && md public && xcopy ..\goroxels-client\dist .\public /Y/E
+rd /S /Q public && md public && xcopy ..\client\dist .\public /Y/E

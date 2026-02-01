@@ -12,6 +12,7 @@ module.exports = {
       { name: 'z' },
       { name: 'jimbo' },
       { name: 'scream' },
+      { name: 'brimstone' },
     ];
 
     const existingBadges = await queryInterface.sequelize.query(

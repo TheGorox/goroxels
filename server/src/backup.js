@@ -69,7 +69,7 @@ async function loadPrevState(chunkManager) {
         meta = JSON.parse(meta.toString());
 
         if(meta.version != 2.2){
-            throw new Error('Unsupported metadata version: ' + (meta.version||1.0));
+            throw new Error('Unsupported metadata version: ' + (meta.version));
         }
 
         const size = meta.chunkSize;

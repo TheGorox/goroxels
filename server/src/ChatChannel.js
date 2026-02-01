@@ -1,5 +1,5 @@
 const ChatMessage = require("./ChatMessage");
-const ChatMessages = require("./db/models/ChatMessages");
+const ChatMessagesModel = require("./db/models/ChatMessages");
 
 class ChatChannel{
     constructor(name){
@@ -15,7 +15,7 @@ class ChatChannel{
     }
 
     async loadFromDb(){
-        const saved = await ChatMessages.findByPk(this.name);
+        const saved = await ChatMessagesModel.findByPk(this.name);
         if(!saved) return;
 
         const entriesRaw = Buffer.from(saved.messagesJson, 'base64');
@@ -35,18 +35,18 @@ class ChatChannel{
 
     async saveToDb(){
         const serializedMsgs = JSON.stringify(this.lastMessages.slice(-10).map(x => x.serialize()));
-        const base64encodedMsgs = Buffer.from(serializedMsgs).toString('base64')
-        const saved = await ChatMessages.count({
+        const base64encodedMsgs = Buffer.from(serializedMsgs).toString('base64');
+        const saved = await ChatMessagesModel.count({
             where: { 'channelName': this.name }
         });
 
         if(!saved) {
-            await ChatMessages.create({
+            await ChatMessagesModel.create({
                 channelName: this.name,
                 messagesJson: base64encodedMsgs
             });
         }else{
-            await ChatMessages.update({ 'messagesJson': base64encodedMsgs }, {
+            await ChatMessagesModel.update({ 'messagesJson': base64encodedMsgs }, {
                 where: {
                     'channelName': this.name
                 }
@@ -54,10 +54,10 @@ class ChatChannel{
         }
     }
 
-    addMessage(name, message, isServer=false){
+    addMessage(name, message, isServer=false, time=Date.now()){
         this._changed = true;
 
-        const cm = new ChatMessage(name, message, isServer);
+        const cm = new ChatMessage(name, message, time, isServer);
         this.lastMessages.push(cm);
 
         if(this.lastMessages.length >= 10*2){
