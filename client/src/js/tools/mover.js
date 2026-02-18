@@ -17,14 +17,14 @@ class Mover extends Tool {
 
         this.handlers();
 
-        this.downPos = [0, 0];
+        this.downPos = null;
 
         // time when "down" was called
         this.downTime = 0;
 
-        this.lastPos = [0, 0];
-        this.lastPlayerPos = [0, 0];
-        this.antijitterDownPos = [0, 0];
+        this.lastPos = null;
+        this.lastPlayerPos = null;
+        this.antijitterDownPos = null;
 
         if (!mobile) {
             this.fx = new FX(this.renderCursor);
@@ -119,9 +119,10 @@ class Mover extends Tool {
         // for template mover
         if (e.ctrlKey) return;
 
-        if (this.lastPlayerPos[0] != player.x ||
+        if (this.lastPlayerPos && 
+            (this.lastPlayerPos[0] != player.x ||
             this.lastPlayerPos[1] != player.y ||
-            this.mousedown) {
+            this.mousedown)) {
             renderFX();
         }
 

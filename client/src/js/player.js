@@ -8,8 +8,8 @@ import { ROLE, ROLE_I } from './constants';
 import { translate as t } from './translate';
 
 const player = {
-    x: 0,
-    y: 0,
+    x: null,
+    y: null,
     color: -1,
     brushSize: 1,
     secondCol: -1,

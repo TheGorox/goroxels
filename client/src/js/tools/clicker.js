@@ -107,8 +107,6 @@ export class Clicker extends Tool {
         return true;
     }
 
-    /*
-    */
     move(e, isUp = false) {
         if (e.gesture) {
             // if gesture is started, we reset mousedown state
@@ -143,8 +141,13 @@ export class Clicker extends Tool {
             [x, y] = [player.x, player.y];
         }
         
-        
-        let line = shapes.line(x, y, this.lastPos[0], this.lastPos[1]);
+        // lastpos could be null if no movement done from the start of the page
+        const x2 = this.lastPos[0] ?? x;
+        const y2 = this.lastPos[1] ?? y;
+
+        if([x, y, x2, y2].some(c => c === null)) return;
+
+        let line = shapes.line(x, y, x2, y2);
         this.lastPos = [x, y];
         
         let circle = [[0, 0]];
@@ -172,7 +175,7 @@ export class Clicker extends Tool {
     }
 
     checkAllowance(count) {
-        return player.bucket.allowance >= count;
+        return player.bucket && player.bucket.allowance >= count;
     }
 
     place(pixels) {
