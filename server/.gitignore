@@ -16,3 +16,6 @@ chunkinfo/dump.js
 chunkinfo/shit.txt
 chunkinfo/
 db.sql
+data/templates/*/*.png
+data/templates/*/*.png
+data/radio/*/*

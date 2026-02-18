@@ -177,7 +177,19 @@ module.exports = {
         "chunkSize": 256,
         "boardWidth": 8,
         "boardHeight": 8,
-        "palette": mainPalette
+        "palette": [...mainPalette, ...secondPalette],
+        "extra": {
+            "palettes": [
+                {
+                    "name": "Goroxels Old",
+                    "slice": [0, 64]
+                },
+                {
+                    "name": "Goroxels New",
+                    "slice": [64]
+                },
+            ]
+        }
     },
     {
         "name": "elka",

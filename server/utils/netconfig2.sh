@@ -15,6 +15,9 @@ ip6tables -A INPUT -p tcp -m multiport --dports http,https -j ACCEPT
 iptables -A INPUT --src 185.139.68.249 -p tcp -m multiport --dports 3000 -j ACCEPT
 ip6tables -A INPUT --src 2a04:5200:fff5::1337 -p tcp -m multiport --dports 3000 -j ACCEPT
 
+iptables -A INPUT --src 89.44.85.204 -p tcp -m multiport --dports 3000 -j ACCEPT
+ip6tables -A INPUT --src 2a04:5201:0007:0000:0000:0000:0000:1253 -p tcp -m multiport --dports 3000 -j ACCEPT
+
 # accept local and output connections
 iptables -A INPUT -i lo -j ACCEPT
 iptables -P OUTPUT ACCEPT
