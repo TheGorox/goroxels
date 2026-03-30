@@ -51,8 +51,7 @@
     "throttle": "^1.0.3",
     "unique-username-generator": "^1.5.1",
     "utf-8-validate": "^5.0.7",
-    "ws": "^7.5.5",
-    "zlib": "^1.0.5"
+    "ws": "^7.5.5"
   },
   "devDependencies": {
     "fs-extra": "^8.1.0",

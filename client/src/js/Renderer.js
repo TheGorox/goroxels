@@ -30,6 +30,7 @@ export default class Renderer {
             this.needRender = true;
         }
         this.chunkPreviews = {};
+        this._mipmapCache = new WeakMap();
 
         this.needRender = true;
 
@@ -174,13 +175,29 @@ export default class Renderer {
     correctSmoothing() {
         if (isMobile) return;
 
-        if (camera.zoom < 1) {
-            this.ctx.imageSmoothingEnabled = true;
-            this.ctx.canvas.style.imageRendering = 'auto'
-        } else {
-            this.ctx.imageSmoothingEnabled = false;
-            this.ctx.canvas.style.imageRendering = 'pixelated'
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.canvas.style.imageRendering = 'pixelated';
+    }
+
+    // step-down mipmap: halve the canvas repeatedly for clean downscaling
+    _getChunkMipmap(chunk, level) {
+        let cached = this._mipmapCache.get(chunk);
+        if (cached && cached.level === level && cached.gen === chunk._renderGen) {
+            return cached.canvas;
         }
+
+        let source = chunk.ctx.canvas;
+        for (let i = 0; i < level; i++) {
+            const half = document.createElement('canvas');
+            half.width = source.width >> 1;
+            half.height = source.height >> 1;
+            const hctx = half.getContext('2d');
+            hctx.drawImage(source, 0, 0, half.width, half.height);
+            source = half;
+        }
+
+        this._mipmapCache.set(chunk, { level, canvas: source, gen: chunk._renderGen });
+        return source;
     }
 
     render() {
@@ -253,7 +270,21 @@ export default class Renderer {
             const chunk = globals.chunkManager.getChunk(cx, cy);
 
             chunk.render();
-            this.ctx.drawImage(chunk.ctx.canvas, offX, offY);
+
+            if (zoom < 1) {
+                const level = Math.max(0, Math.floor(-Math.log2(zoom)));
+                const mip = this._getChunkMipmap(chunk, level);
+                const mipScale = 1 << level;
+                // draw mip at natural size with scale compensation
+                // total scale = zoom * mipScale (0.5..1x), single step, no intermediate upscale
+                this.ctx.save();
+                this.ctx.translate(offX, offY);
+                this.ctx.scale(mipScale, mipScale);
+                this.ctx.drawImage(mip, 0, 0);
+                this.ctx.restore();
+            } else {
+                this.ctx.drawImage(chunk.ctx.canvas, offX, offY);
+            }
         });
 
         this.ctx.restore();

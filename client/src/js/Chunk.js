@@ -57,6 +57,7 @@ export default class Chunk {
         this.pView = new Uint32Array(this.pImgData.data.buffer);
 
         this.needRender = true;
+        this._renderGen = 0;
 
         this.fromBuffer(buffer);
     }
@@ -65,6 +66,7 @@ export default class Chunk {
     render() {
         if (this.needRender) {
             this.needRender = false;
+            this._renderGen++;
             this.ctx.putImageData(this.imgData, 0, 0);
 
             if (game.showProtected) {
