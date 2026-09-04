@@ -1,0 +1,73 @@
+@font-face {
+	font-family: "BoldPixels";
+	src: url("/fonts/BoldPixels.ttf") format("truetype");
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Inter-Regular";
+	src: url("/fonts/Inter-Regular.otf") format("opentype");
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Inter-SemiBold";
+	src: url("/fonts/Inter-SemiBold.otf") format("opentype");
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Inter-Light";
+	src: url("/fonts/Inter-Light.otf") format("opentype");
+	font-weight: lighter;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	box-sizing: border-box;
+
+	font-family: BoldPixels, sans-serif;
+}
+
+
+:root {
+	--font-base: 16px;
+
+	--text-xxs: 0.6785rem;
+	--text-xs: 0.8125rem;
+	--text-sm: 0.875rem;
+	--text-base: 0.9375rem;
+	--text-lg: 1.0625rem;
+	--text-xl: 1.25rem;
+	--text-2xl: 1.5rem;
+
+	--text-x05: 10px; /* hardcoded but it's fine */ 
+	--text-x2: calc(var(--font-base) * 2);
+}
+
+html {
+	font-size: var(--font-base);
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+
+	width: 100vw;
+	height: 100vh;
+
+	overflow: hidden;
+}
+
+*, *::before, *::after {
+	box-sizing: inherit;
+}
+
+a {
+	text-decoration: none;
+}

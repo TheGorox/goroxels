@@ -10,7 +10,7 @@ const router = express.Router();
 
 const limiter = rateLimiter.byIdOrIp({
     time: 5 * MINUTE,
-    max: 3
+    max: 5
 })
 
 function error(res, error) {

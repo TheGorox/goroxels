@@ -3,10 +3,10 @@ const path = require('path');
 const fs = require('fs');
 const PNG = require('pngjs').PNG;
 
-const CANVAS = process.argv[2] || 3;
+const CANVAS = process.argv[2] || 0;
 const backupPath = path.join(__dirname, '../backup', CANVAS.toString());
 
-const exportPath = `D:/goroxelsScreens/'${CANVAS}-${(new Date()).toISOString().replace(/:/g, '-')}`;
+const exportPath = `H:/goroxelsScreens/${CANVAS}-${(new Date()).toISOString().replace(/:/g, '-')}`;
 
 function parseDate(str) {
     str = str.replace(/\./g, '');
@@ -111,7 +111,7 @@ async function main(){
 
     let counter = 0;
 
-    for(day of days){
+    for(const day of days){
 
         const times = fs.readdirSync(path.join(backupPath, day));
         

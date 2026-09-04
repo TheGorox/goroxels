@@ -54,10 +54,10 @@ class ChatChannel{
         }
     }
 
-    addMessage(name, message, isServer=false, time=Date.now()){
+    addMessage(name, message, isServer=false, time=Date.now(), replyingTo=null){
         this._changed = true;
 
-        const cm = new ChatMessage(name, message, time, isServer);
+        const cm = new ChatMessage(name, message, time, isServer, replyingTo);
         this.lastMessages.push(cm);
 
         if(this.lastMessages.length >= 10*2){

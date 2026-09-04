@@ -1,7 +1,7 @@
 const User = require('./User');
 const Sequelize = require('sequelize');
 
-const sequelize = require('../index');
+const { sequelize } = require('../index');
 
 const Pixel = sequelize.define('pixel', {
     x: {
@@ -25,9 +25,5 @@ const Pixel = sequelize.define('pixel', {
 });
 Pixel.removeAttribute('id');
 
-User.hasMany(Pixel);
-Pixel.belongsTo(User, {primaryKey: true});
-
-Pixel.sync();
 
 module.exports = Pixel

@@ -1,52 +1,33 @@
 {
-  "name": "goroxels-client",
-  "version": "1.1.0",
-  "description": "",
-  "main": "src/js/main.js",
-  "scripts": {
-    "devBuild": "webpack",
-    "build": "webpack",
-    "release": "webpack --env release"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/TheGorox/goroxels.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/TheGorox/goroxels/issues"
-  },
-  "homepage": "https://github.com/TheGorox/goroxels#readme",
-  "devDependencies": {
-    "@babel/core": "^7.7.7",
-    "@babel/preset-env": "^7.7.7",
-    "babel-loader": "^8.0.6",
-    "copy-webpack-plugin": "^13.0.1",
-    "file-loader": "^5.0.2",
-    "html-loader": "^4.2.0",
-    "html-webpack-template": "^6.2.0",
-    "mini-css-extract-plugin": "^1.3.3",
-    "webpack": "^5.75.0",
-    "webpack-obfuscator": "^3.5.1"
-  },
-  "dependencies": {
-    "babel-core": "^4.7.16",
-    "babel-preset-env": "^0.0.0",
-    "circular-dependency-plugin": "^5.2.0",
-    "css-loader": "^3.4.0",
-    "exports-loader": "^4.0.0",
-    "fflate": "^0.8.2",
-    "fs-extra": "^8.1.0",
-    "html-webpack-plugin": "^5.5.0",
-    "interactjs": "^1.7.3",
-    "jquery": "^3.5.1",
-    "pako": "^1.0.10",
-    "querystring": "^0.2.1",
-    "resolve-url-loader": "^5.0.0",
-    "style-loader": "^1.1.1",
-    "toastr": "^2.1.4",
-    "webpack-cli": "^5.0.0"
-  }
+	"name": "goroxels-client",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"build:dev": "vite build --mode development && npm run postbuild",
+		"postbuild": "cpy \"build/**/*\" ../server/public --parents --clean",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"lint": "prettier --check .",
+		"format": "prettier --write ."
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^7.0.1",
+		"@sveltejs/adapter-static": "^3.0.10",
+		"@sveltejs/kit": "^2.55.0",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"cpy-cli": "^7.0.0",
+		"prettier": "^3.8.1",
+		"prettier-plugin-svelte": "^3.5.1",
+		"svelte": "^5.55.1",
+		"vite": "^7.3.1"
+	},
+	"dependencies": {
+		"svelte-i18n": "^4.0.1",
+		"svelte-sonner": "^1.1.0",
+		"svelte-virtuallists": "^1.4.2",
+		"unicode-emoji-json": "^0.9.0"
+	}
 }

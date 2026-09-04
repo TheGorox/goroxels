@@ -152,7 +152,7 @@ async function chunkToImage(w, h, palette, data, name){
 
         for(let i = 0; i < data.length; i++){
             const I = i << 2;
-            const color = data[i]&0x7F;
+            const color = data[i]&0x3F;
             const rgbed = palette[color];
 
             png.data[I] = rgbed[0];
@@ -170,7 +170,7 @@ async function chunkToImage(w, h, palette, data, name){
 // of chunk colors
 // 0b11111111 means no change, otherwise update
 // thus, maximum colors count practically reduced
-// to 0b111111 = 64
+// to 0b1111111 = 128
 function conjuctChunks(prevState, chunkManager){
     let ignoreDiffFlag = false;
 

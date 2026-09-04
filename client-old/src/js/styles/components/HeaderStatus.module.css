@@ -1,0 +1,23 @@
+@import '../globals/media.css';
+
+.header {
+  position: fixed;
+  top: 5px;
+  left: 5px;
+}
+
+.headerText {
+  user-select: none;
+  
+  font-size: 2em;
+
+  --outline-size: 2px;
+  --outline-color: var(--default);
+  text-shadow: calc(var(--outline-size)) 0 var(--outline-color), calc(var(--outline-size) * -1) 0 var(--outline-color), 0 calc(var(--outline-size)) var(--outline-color), 0 calc(var(--outline-size) * -1) var(--outline-color);
+}
+
+@media (--mobile) {
+  .header {
+    display: none;
+  }
+}

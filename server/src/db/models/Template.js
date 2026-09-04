@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize');
 
-const sequelize = require('../index');
+const { sequelize } = require('../index');
 const { User } = require('./User');
 
 const Template = sequelize.define('template', {
@@ -26,8 +26,5 @@ const Template = sequelize.define('template', {
         allowNull: true,
     }
 });
-
-Template.belongsTo(User);
-User.hasMany(Template);
 
 module.exports = Template;

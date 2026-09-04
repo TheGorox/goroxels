@@ -22,8 +22,26 @@ const config = require('./config');
 const { STRING_OPCODES } = require('./protocol');
 const ms = require('ms');
 const { DAY } = require('./constants');
+const { patchIndex } = require('./ssr');
+const indexWatcher = require('./indexWatcher');
+const { checkCanvasConditions } = require('./utils/canvas');
+const { terminateWsWithMessage } = require('./utils/http');
+const { CLOSE_CODES } = require('../../shared/protocol');
 
-const APIKEY = process.env.APISOCKET_KEY
+const APIKEY = process.env.APISOCKET_KEY;
+
+// for SSR SEO shit like description/title 
+// (needs to be the right language before js)
+const indexPath = path.resolve(__dirname, '../public/index.html');
+let indexTemplate = fs.readFileSync(indexPath, 'utf8');
+// watch for index changes
+indexWatcher({
+    logger,
+    filePath: indexPath,
+    callback: (newIndex) => indexTemplate = newIndex
+});
+
+const stickersPath = path.resolve(__dirname, '../data/stickers');
 
 function startServer(port) {
     ///// HTTP
@@ -33,7 +51,7 @@ function startServer(port) {
     let httpsOptions = {};
     let key, cert;
     let httpServer = http;
-    try { // probably doesn't work, we use Cloudflare for ssl
+    try {
         key = fs.readFileSync(process.env.SSL_KEY, 'utf-8');
         cert = fs.readFileSync(process.env.SSL_CERT, 'utf-8');
         httpsOptions.key = key;
@@ -41,7 +59,7 @@ function startServer(port) {
 
         httpServer = https;
         port = 443;
-
+        logger.warn(`port was changed to 443 since ssl key/cert found!`)
     } catch {
         logger.warn('Unable to load ssl key/cert')
     }
@@ -80,6 +98,13 @@ function startServer(port) {
     })
 
     app.use('/api', api);
+
+    // enables coop/coep headers to make worker's SharedArrayBuffer work
+    app.use((req, res, next) => {
+        res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+        res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+        next();
+    });
 
     const publicDir = path.join(__dirname, '/../public');
 
@@ -128,8 +153,19 @@ function startServer(port) {
         res.sendFile('radio.html', { root: publicDir });
     });
 
-    app.use(express.static(publicDir));
-    app.use(/\/[\d\w]{0,32}/, express.static(publicDir));
+    app.use(
+        '/uploads/stickers',
+        express.static(stickersPath, {
+            maxAge: '30d',
+            setHeaders: (res) => {
+                res.setHeader('Cache-Control', 'public, no-transform, max-age=2592000');
+            },
+            fallthrough: true,
+        })
+    );
+
+    app.use(express.static(publicDir, { index: false }));
+    app.use(/\/[\d\w]{0,32}/, express.static(publicDir, { index: false }));
 
     const webSocketServer = new Socket();
 
@@ -142,7 +178,22 @@ function startServer(port) {
     webSocketServer.run(server);
     const wss = webSocketServer.wss;
     server.on('upgrade', async (request, socket, head) => {
+        if (!global.canvases) {
+            logger.warn('No canvases loaded yet, rejecting socket');
+            terminateWsWithMessage(socket, CLOSE_CODES.SERVER_ERROR, 'not_initialized');
+            return;
+        }
+
+        socket.setTimeout(3000); // "slowloris protection", will be cleared on successful connection
         socket.realIp = getIPv6Subnet(getIPFromRequest(request));
+
+        const requestedCanvasName = request.url.split('/')[1];
+        const requestedCanvas = global.canvases?.find(c => c.name === requestedCanvasName);
+
+        if (!requestedCanvas) {
+            terminateWsWithMessage(socket, CLOSE_CODES.CLIENT_ERROR, 'invalid_canvas');
+            return;
+        }
 
         let user;
 
@@ -157,17 +208,27 @@ function startServer(port) {
             }
         } else {
             if (!webSocketServer.verifyClient(request, socket)) {
-                socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
-                socket.destroy();
+                terminateWsWithMessage(socket, CLOSE_CODES.CLIENT_ERROR, 'rate_limit');
                 return
             }
             user = await verifyUser(request);
+
+            if (user?.role === 'BANNED') {
+                let msg;
+                if (client.user.bannedUntil) {
+                    const timeLeft = Math.max(client.user.bannedUntil - Date.now(), 0);
+                    msg = `bannedUntil:${ms(timeLeft)}`;
+                }
+                else
+                    msg = 'bannedUntil:permament';
+                terminateWsWithMessage(socket, CLOSE_CODES.BANNED, msg);
+                return;
+            }
 
             if (!user || user.role === 'USER') {
                 // will defer socket closing if proxy isn't cached
                 const isBanned = proxyCheck(socket.realIp, () => {
                     wss.clients.forEach(client => {
-                        console.log(client.ip, socket.realIp);
                         if (client.ip === socket.realIp) {
                             client.close();
                         }
@@ -176,25 +237,33 @@ function startServer(port) {
 
                 if (isBanned) {
                     const until = expiresFromCache(socket.realIp);
-                    wss.handleUpgrade(request, socket, head, function done(ws) {
-                        const errMsg = {
-                            msg: 'bannedUntil',
-                            data: ms(Math.max(until-Date.now(), 0))
-                        }
-                        ws.send(JSON.stringify({c: STRING_OPCODES.error, errors: [errMsg]}))
-                        ws.close();
-                    });
-                    return
+                    const untilFormatted = ms(Math.max(until - Date.now(), 0));
+                    terminateWsWithMessage(socket, CLOSE_CODES.BANNED, 'bannedUntil:' + untilFormatted);
+                    return;
                 }
             }
 
-            logger.debug('Going to upgrade ip ' + socket.realIp + ' with user ' + (user ? user.name : null));
         }
 
+        if (requestedCanvas.require && !checkCanvasConditions(user, requestedCanvas.require)) {
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+
+        logger.debug('Going to upgrade ip ' + socket.realIp + ' with user ' + (user ? user.name : null));
 
         wss.handleUpgrade(request, socket, head, function done(ws) {
-            wss.emit('connection', ws, request, user);
+            socket.setTimeout(30000);
+
+            wss.emit('connection', ws, request, user, requestedCanvas);
         });
+    });
+
+    // SPA fallback for SSR
+    app.get('*', (req, res) => {
+        const patched = patchIndex(indexTemplate, req.headers['accept-language']);
+        res.send(patched);
     });
 }
 

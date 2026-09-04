@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize');
 
-const sequelize = require('../index');
+const { sequelize } = require('../index');
 const {User} = require('./User');
 
 const Whitelist = sequelize.define('whitelist', {
@@ -13,10 +13,5 @@ const Whitelist = sequelize.define('whitelist', {
     timestamps: true,
     updatedAt: false
 });
-
-Whitelist.belongsTo(User, {
-    foreignKey: 'addedBy'
-});
-Whitelist.sync();
 
 module.exports = Whitelist

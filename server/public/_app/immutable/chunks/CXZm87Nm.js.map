@@ -1,0 +1,1 @@
+{"version":3,"file":"CXZm87Nm.js","sources":["../../../../../../node_modules/svelte/src/internal/flags/legacy.js"],"sourcesContent":["import { enable_legacy_mode_flag } from './index.js';\n\nenable_legacy_mode_flag();\n"],"names":[],"mappings":";AAEA,wBAAuB;","x_google_ignoreList":[0]}

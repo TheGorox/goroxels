@@ -1,5 +1,5 @@
 
-const publicConfig = require('../../shared/config.js');
+const publicConfig = require('../../shared/config.export.cjs');
 
 const config = {
     port: 80,

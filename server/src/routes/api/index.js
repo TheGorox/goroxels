@@ -16,6 +16,7 @@ const chunks = require('./chunks');
 const radio = require('./radio');
 const badges = require('./badges');
 const template = require('./template');
+const { router: stickers } = require('./stickers');
 
 const router = express.Router();
 
@@ -29,13 +30,13 @@ router.use(passport.initialize());
 router.use(passport.session());
 
 router.use((req, res, next) => {
-    res.error = function(error){
+    res.error = function (error) {
         res.json({
             success: false,
             errors: [error]
         })
     }
-    
+
     next();
 });
 
@@ -51,6 +52,7 @@ router.use('/online', online);
 router.use('/pixelInfo', pixelInfo);
 router.use('/badges', badges);
 router.use('/template', template);
+router.use('/stickers', stickers);
 
 router.use('/admin', admin);
 

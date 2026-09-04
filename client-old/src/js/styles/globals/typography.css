@@ -1,0 +1,9 @@
+@font-face {
+  font-family: 'BoldPixels';
+  src: url('@/font/BoldPixels.ttf') format('truetype');
+}
+
+:root {
+    font-size: 16px;
+    font-family: 'BoldPixels';
+}

@@ -2,10 +2,10 @@ const EventEmitter = require('events');
 const ChatMessage = require('./ChatMessage');
 
 const {
-    STRING_OPCODES,
-    OPCODES,
     createStringPacket
 } = require('./protocol');
+const { STRING_OPCODES, OPCODES } = require('../../shared/protocol.js');
+const Bucket = require('../../shared/classes/Bucket.js').default;
 
 const logger = require('./logger')('CLIENT', 'debug');
 
@@ -18,11 +18,14 @@ const CLIENT_STATES = {
 class Client extends EventEmitter {
     static lastId = 0;
 
+    #weirds = 0;
+
     constructor(socket) {
         super();
 
         this.socket = socket;
         this.bucket = null;
+        this.wsBucket = new Bucket(15, 50, true);
 
         this.canvas = null;
 
@@ -47,6 +50,19 @@ class Client extends EventEmitter {
         })
     }
 
+    get weirds(){
+        return this.#weirds;
+    }
+
+    set weirds(newValue){
+        this.#weirds = newValue;
+        if(this.#weirds > 5){
+            logger.warn(`Killing client ${this.id} (${this.user?.username || 'Unknown'}|${this.ip}) for weirdness (weirds: ${this.#weirds})`);
+            this.sendReload();
+            this.kill();
+        }
+    }
+
     setCanvas(canvas) {
         this.canvas = canvas;
     }
@@ -60,16 +76,14 @@ class Client extends EventEmitter {
         this.send(str);
     }
 
-    sendChatWarn(msg, channel) {
-        const chatMessage = new ChatMessage('', `[b][WARN] ${msg}[/b]`, true);
+    sendChatWarn(from, msg, channel, isServer=false) {
+        const chatMessage = new ChatMessage('', `${msg}`, Date.now(), isServer, null, Math.random());
         const packet = createStringPacket.chatMessage(chatMessage, channel);
         this.send(JSON.stringify(packet));
     }
 
-    sendChat(name, msg, channel, isServer) {
-        const chatMessage = new ChatMessage(name, msg, isServer);
-        const packet = createStringPacket.chatMessage(chatMessage, channel);
-        this.send(JSON.stringify(packet));
+    sendChatWarn(msg, channel) {
+        this.sendChatWarn('', `[b][WARN] ${msg}[/b]`, channel, true);
     }
 
     sendCaptcha() {
@@ -80,6 +94,7 @@ class Client extends EventEmitter {
     }
 
     kill() {
+        logger.debug(`killing this client (${this.id})`)
         this.socket.close();
     }
 
@@ -95,6 +110,15 @@ class Client extends EventEmitter {
 
     heartbeat() {
         this.isAlive = true;
+    }
+
+    isCooldownZero() {
+        return this.bucket && this.bucket.delay === 0;
+    }
+
+    sendReload(){
+        const str = JSON.stringify({ c: STRING_OPCODES.reload });
+        this.send(str);
     }
 }
 

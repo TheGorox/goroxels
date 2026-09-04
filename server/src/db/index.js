@@ -26,4 +26,12 @@ const sequelize = new Sequelize(
     config
 );
 
-module.exports = sequelize
+async function initDB(){
+    const { initModels } = require('./models');
+    await initModels();
+}
+
+module.exports = {
+    initDB,
+    sequelize
+}

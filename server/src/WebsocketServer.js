@@ -11,15 +11,14 @@ const { MAX_CLIENTS_PER_IP } = require('./config');
 const { ROLE, ROLE_I, MINUTE, chatBucket } = require('./constants');
 
 const { Client } = require('./Client');
-const Bucket = require('./Bucket');
+const Bucket = require('../../shared/classes/Bucket.js').default;
 const ChatChannel = require('./ChatChannel');
 
 const {
-    OPCODES,
-    STRING_OPCODES,
     createPacket,
     createStringPacket,
 } = require('./protocol');
+const { STRING_OPCODES, OPCODES, PLACE_TYPE, PIXEL_FLAG_MASK } = require('../../shared/protocol.js');
 
 const { checkCanvasConditions } = require('./utils/canvas');
 const { checkRole } = require('./utils/role');
@@ -32,18 +31,23 @@ let instance = null;
 
 // conditions for msg broadcasting
 const CONDITION = {
-    sameCanvas: client => _c => _c.canvas == client.canvas
-}
+    sameCanvas: (client, dontSendToTarget = false) => {
+        return _c => _c.canvas === client.canvas && (!dontSendToTarget || _c !== client);
+    }
+};
 
-// this number is used for masking/hiding invalid pixels
-// in opcodes.pixels message
-const notValidPixel = 0xffff;
-function writeInvalidPixel(buffer, i) {
-    // TODO: rework this
-    buffer.writeUInt16BE(0xffff, i);
-    buffer.writeUInt16BE(0xffff, i + 2);
-}
+const ROLE_LIMITS = {
+    'ADMIN': 16 * 1024 * 1024,  // 16 MB
+    'MOD': 16 * 1024 * 1024,    // 16 MB
+    'TRUSTED': 5 * 1024 * 1024, // 5 MB
+    'USER': 100 * 1024,         // 100 KB
+    'GUEST': 10 * 1024          // 10 KB
+};
 
+const CLIENT_ALLOWED_FLAGS = PIXEL_FLAG_MASK.takeOwnership | PIXEL_FLAG_MASK.isProtect | PIXEL_FLAG_MASK.usesMask;
+const SERVER_ALLOWED_FLAGS = PIXEL_FLAG_MASK.isSingle | PIXEL_FLAG_MASK.isProtect | PIXEL_FLAG_MASK.usesMask | PIXEL_FLAG_MASK.compressed;
+
+const isPositiveNumber = (v) => Number.isFinite(v) && v > 0;
 
 class Server {
     /**
@@ -54,7 +58,7 @@ class Server {
         return instance
     }
 
-    static PIXEL_SEND_INTERVAL = 20;
+    static PIXEL_SEND_INTERVAL = 50;
 
     constructor() {
         this.canvases = global.canvases;
@@ -93,7 +97,8 @@ class Server {
 
         const wss = new WebSocketServer({
             noServer: true,
-            maxPayload: /*262175*/250 * 250 * 5 + 6
+            maxPayload: ROLE_LIMITS.GUEST,
+            closeTimeout: 5000,
         });
 
         this.channels.global = new ChatChannel('global');
@@ -104,21 +109,20 @@ class Server {
 
             this.connections[canvas.name] = {};
 
-            const pixelSize = createPacket.pixelSendQueueBufferSize;
-            const maxPixelQueue = 1000,
-                bufferLimit = pixelSize * maxPixelQueue;
+            const bufferLimit = 256 * 1024;
+            const buffer = Buffer.alloc(bufferLimit);
+
             this.broadcastPixelQueue.set(canvas, {
-                maxOffset: bufferLimit - pixelSize,
-                // extra 1 is for OP
-                buffer: Buffer.alloc(bufferLimit + 1),
+                buffer,
+                view: new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength),
                 curOffset: 0,
 
                 interval: null
             });
             this.startOrRestartPixelQueueBroadcastInterval(canvas);
-        })
+        });
 
-        wss.on('connection', (socket, request, user) => {
+        wss.on('connection', (socket, request, user, canvas) => {
             const ip = getIPv6Subnet(getIPFromRequest(request));
             const ipInt = ipToInt(ip);
 
@@ -127,19 +131,20 @@ class Server {
             client.ip = ip;
             client.ipInt = ipInt;
 
-            if (client.user?.role === 'BANNED') {
-                if (client.user.bannedUntil) {
-                    const timeLeft = Math.max(client.user.bannedUntil - Date.now(), 0);
-                    client.sendError({
-                        msg: 'bannedUntil',
-                        data: ms(timeLeft)
-                    });
-                } else {
-                    client.sendError('banned');
+            client.canvas = canvas;
+
+            let cooldown = client.canvas.cooldown.GUEST;
+            if (client.user) {
+                const role = client.user.role || 'USER';
+                client.socket._receiver._maxPayload = ROLE_LIMITS[role];
+
+                if (role == 'ADMIN')
+                    cooldown = [0, 32]
+                else {
+                    cooldown = client.canvas.cooldown[client.user.role];
                 }
-                client.kill();
-                return;
             }
+
 
             this.clients.set(client.id, client);
 
@@ -149,12 +154,18 @@ class Server {
                 this.connections['TOTAL'][ip] = 1;
 
             socket.onclose = () => {
+                logger.debug('socket closed')
                 this.clients.delete(client.id);
 
                 // won't let users use reconnection to reset cd or spam
+                const currentIp = ip;
+                const canvasName = client.canvas ? client.canvas.name : null;
+
                 setTimeout(() => {
-                    this.connections['TOTAL'][ip]--;
-                    client.canvas && this.connections[client.canvas.name][ip]--
+                    if (this.connections['TOTAL'][currentIp]) this.connections['TOTAL'][currentIp]--;
+                    if (canvasName && this.connections[canvasName] && this.connections[canvasName][currentIp]) {
+                        this.connections[canvasName][currentIp]--;
+                    }
                 }, 900);
 
                 if (!client.user || !client.user.isApiSocket) {
@@ -184,32 +195,38 @@ class Server {
                 client.sendCaptcha();
             }
 
-            // this will also make the client knowing how much his network delay is
-            client.ping();
+            client.bucket = new Bucket(...cooldown);
+            this.onCanvasChosen(client.canvas, client);
         });
         wss.on('error', err => {
             logger.error(err);
         })
 
         this.wss = wss;
-        setInterval(this.ping.bind(this), 45000);
+        setInterval(this.ping.bind(this), 35000);
     }
 
     // sometimes we may need to change interval delay
     startOrRestartPixelQueueBroadcastInterval(canvas, intervalDelay = Server.PIXEL_SEND_INTERVAL) {
         const objPixelQueueRef = this.broadcastPixelQueue.get(canvas);
 
-        // this byte is never changed later and writer preserves it
-        objPixelQueueRef.buffer.writeUint8(OPCODES.placeBatch, 0);
+        // this bytes are never changed later and the writer preserves them
+        objPixelQueueRef.buffer.writeUint8(OPCODES.place, 0);
+        objPixelQueueRef.buffer.writeUint8(PLACE_TYPE.pixels, 1);
 
         clearInterval(objPixelQueueRef.interval);
         objPixelQueueRef.interval = setInterval(() => {
-            if (objPixelQueueRef.curOffset) {
-                let subBuffer = objPixelQueueRef.buffer.subarray(0, objPixelQueueRef.curOffset + 1);
-                this.broadcastForCanvasFast(canvas, subBuffer);
-                objPixelQueueRef.curOffset = 0;
-            }
+            this.flushPixelQueue(canvas);
         }, intervalDelay);
+    }
+
+    flushPixelQueue(canvas) {
+        const pixelQueue = this.broadcastPixelQueue.get(canvas);
+        if (pixelQueue.curOffset > 2) {
+            let subBuffer = pixelQueue.buffer.subarray(0, pixelQueue.curOffset);
+            this.broadcastForCanvasFast(canvas, subBuffer);
+            pixelQueue.curOffset = 2; // reset to the position after header (opcode + type)
+        }
     }
 
 
@@ -241,7 +258,7 @@ class Server {
 
     checkDelay(client) { // delay for placing after join
         // can be set only through the admin menu
-        if (config.afterJoinDelay == 0) return true;
+        if (config.afterJoinDelay === 0) return true;
         if (!client.joinTime) return false;
 
         return (Date.now() >= (client.joinTime + config.afterJoinDelay))
@@ -254,26 +271,32 @@ class Server {
     }
 
     onmessage(client, ev) {
+        logger.debug('msg type = ' + JSON.stringify(ev));
+
         if (ev.type !== 'message') return;
+
+        // ws rate limiting
+        if (!client.wsBucket.spend(1)) {
+            client.kill();
+            return;
+        }
 
         client.isAlive = true;
 
         let message = ev.data;
+        console.log({ message }, Date.now())
 
-        if (typeof message === 'string') {
-            logger.debug('Got string message: ' + message);
+        try {
+            if (typeof message === 'string') {
+                logger.debug('Got string message: ' + message);
 
-            try {
                 this.handleStringMessage(message, client);
-            } catch (e) {
-                logger.error(e.message)
-            }
-        } else {
-            try {
+            } else {
                 this.handleBinaryMessage(message, client);
-            } catch (e) {
-                logger.error(e.message)
             }
+        } catch (e) {
+            logger.error(e.message)
+            client.weirds += 0.5;
         }
     }
 
@@ -283,97 +306,24 @@ class Server {
         this.broadcastStringByCond(packetStr, CONDITION.sameCanvas({ canvas }));
     }
 
+
     handleBinaryMessage(message, client) {
         switch (message.readUInt8(0)) {
-            case OPCODES.chunk: {
-                if (!this.checkCanvas(client)) return;
-
-                const cx = message.readUInt8(1),
-                    cy = message.readUInt8(2);
-
-                const canvas = client.canvas;
-
-                if (cx < 0 || cy < 0 || cx >= canvas.width || cy >= canvas.height) {
-                    return client.sendError('Chunk coordinates out of bounds');
-                }
-
-                function send() {
-                    chunkManager.getChunkData(cx, cy).then(([chunkData]) => {
-                        client.send(createPacket.chunkSend(cx, cy, chunkData));
-                    });
-                }
-
-                const chunkManager = canvas.chunkManager;
-                if (!chunkManager.loaded) {
-                    chunkManager.once('loaded', send)
-                } else send()
-
-                break
+            case OPCODES.ping: {
+                client.emit('pong');
+                break;
             }
 
             case OPCODES.place: {
-                if (!this.checkCanvas(client) ||
-                    !this.checkCaptcha(client) ||
-                    !this.checkDelay(client) ||
-                    !this.checkShadowBan(client)) return;
-
-                if (!client.bucket.spend(1)) {
-                    return
-                };
-
-                const canvas = client.canvas;
-
-                const x = message.readUInt16BE(1);
-                const y = message.readUInt16BE(3);
-                const c = message.readUInt8(5);
-
-                if (x < 0 || x >= canvas.realWidth ||
-                    y < 0 || y >= canvas.realHeight ||
-                    c < 0 || c >= canvas.palette.length) return;
-
-                const oldPixel = canvas.chunkManager.getChunkPixel(x, y);
-
-                // is protected
-                if (oldPixel & 0x80) {
-                    if (!client.user ||
-                        ROLE[client.user.role] < ROLE.TRUSTED) {
-                        return
-                    }
-                }
-
-                if ((oldPixel & 0x7F) === c)
-                    return;
-
-                canvas.chunkManager.setChunkPixel(x, y, c);
-
-                const broadcastQueue = this.broadcastPixelQueue.get(canvas);
-                if (broadcastQueue.curOffset <= broadcastQueue.maxOffset) {
-                    createPacket.pixelSendEnqueue(x, y, c, client.id, broadcastQueue.buffer, broadcastQueue.curOffset + 1)
-                    broadcastQueue.curOffset += createPacket.pixelSendQueueBufferSize;
-                } else {
-                    // we'll just send a single pixel in case that queue buffer is overflowed
-                    const pixel = createPacket.pixelSend(x, y, c, client.id);
-                    this.broadcastForCanvasFast(canvas, pixel);
-                }
-
-                canvas.chunkManager.setPlacerDataRaw(x, y, client.placeInfoFlag, client.placeInfoNumber);
-
-                break
-            }
-            case OPCODES.pixels: {
                 if (!this.checkCanvas(client) ||
                     !this.checkCaptcha(client) ||
                     !this.checkUser(client) ||
                     !this.checkDelay(client) ||
                     !this.checkShadowBan(client)) return;
 
-                const isProtect = !!message.readUInt8(1);
+                const clientCanvas = client.canvas;
+
                 const isMod = ROLE[client.user.role] >= ROLE.MOD;
-
-                if (isProtect && !isMod) {
-                    return
-                }
-
                 const isTrusted = ROLE[client.user.role] >= ROLE.TRUSTED;
                 const isApiSocket = client.user.isApiSocket;
 
@@ -382,125 +332,212 @@ class Server {
                 } = client.canvas;
                 const maxClrId = isProtect ? 1 : client.canvas.palette.length - 1;
 
-                const pxlsCount = (message.length - 6) / 4;
+                const placeSubtype = message.readUInt8(1);
+                const dv = new DataView(message.buffer, message.byteOffset, message.byteLength);
+                switch (placeSubtype) {
+                    case PLACE_TYPE.pixels: {
+                        let flags = dv.getUint8(2) & CLIENT_ALLOWED_FLAGS;
+                        const takeOwnership = !!(flags & PIXEL_FLAG_MASK.takeOwnership);
 
-                if (!isProtect && client.bucket.allowance < pxlsCount) {
-                    return
-                }
-                client.bucket.spend(pxlsCount);
-
-                // tests revealed that dataView is faster
-                // than readXXX functions of the buffer 
-                // (second one uses bound checks/validations)
-                // this is critical for really large batches
-                const fastBuf = new DataView(message.buffer, message.byteOffset, message.byteLength);
-                for (let i = 6; i < message.length; i += 5) {
-                    const x = fastBuf.getUint16(i, false);
-                    const y = fastBuf.getUint16(i + 2, false);
-                    const clr = fastBuf.getUint8(i + 4);
-
-
-                    if (clr < 0 || clr > maxClrId) {
-                        continue
-                    }
-
-                    if (x < 0 || x >= realWidth ||
-                        y < 0 || y >= realHeight) continue;
-
-                    if (!isTrusted) {
-                        // check for protection
-                        const oldPixel = client.canvas.chunkManager.getChunkPixel(x, y);
-                        if (oldPixel & 0x80) {
-                            writeInvalidPixel(message, i);
-                            continue;
+                        if (!takeOwnership && !isMod) {
+                            client.sendReload();
+                            client.kill();
+                            return;
                         }
+
+                        const broadcastQueue = this.broadcastPixelQueue.get(canvas);
+                        const size = dv.byteLength - 3;
+                        if (size % 5 !== 0) {
+                            client.sendReload();
+                            client.kill();
+                            return;
+                        }
+
+                        const outSize = 2 + 1 + 2 + size; // uid + flags + size + pixels
+                        const isSingle = size === 5;
+                        if (isSingle) {
+                            flags |= PIXEL_FLAG_MASK.isSingle;
+                        } else if (outSize >= broadcastQueue.buffer.byteLength - 2) {
+                            client.sendError('pixel buffer overflow');
+                            client.kill();
+                            return;
+                        }
+
+                        if (broadcastQueue.curOffset + outSize >= broadcastQueue.byteLength) {
+                            this.flushPixelQueue(clientCanvas);
+                            client.weirds += 0.5;
+                        }
+
+                        const outDv = broadcastQueue.view;
+
+                        // using vitual offset so we don't have to revert changes if something goes wrong
+                        let virtOffset = broadcastQueue.curOffset;
+                        outDv.setUint16(virtOffset, client.id); virtOffset += 2;
+                        outDv.setUint8(virtOffset, flags & SERVER_ALLOWED_FLAGS); virtOffset += 1;
+
+                        let outSizePos = virtOffset;
+                        if (!isSingle) virtOffset += 2;
+                        let pixelsWrote = 0;
+
+                        for (let i = 2; i < size; i += 5) {
+                            const x = dv.getUint16(i);
+                            const y = dv.getUint16(i + 2);
+                            const c = dv.getUint8(i + 4);
+
+                            if (x >= realWidth ||
+                                y >= realHeight ||
+                                c > maxClrId) {
+                                client.weirds += 1;
+                                break;
+                            };
+
+                            if (!client.bucket.spend(1)) {
+                                break;
+                            }
+
+                            if (!isTrusted) {
+                                // check for protection
+                                const oldPixel = client.canvas.chunkManager.getChunkPixel(x, y);
+                                if (oldPixel & 0x80) {
+                                    continue;
+                                }
+                            }
+
+                            if (isProtect && isTrusted) {
+                                client.canvas.chunkManager.setPixelProtected(x, y, c);
+                            } else {
+                                client.canvas.chunkManager.setChunkPixel(x, y, c, !isApiSocket); // <-- do not backup apisocket pixels
+                                if (takeOwnership || !isMod) { // only mods can place without taking ownership
+                                    client.canvas.chunkManager.setPlacerDataRaw(x, y, client.placeInfoFlag, client.placeInfoNumber);
+                                }
+                            }
+
+                            outDv.setUint16(virtOffset, x); virtOffset += 2;
+                            outDv.setUint16(virtOffset, y); virtOffset += 2;
+                            outDv.setUint8(virtOffset, c); virtOffset += 1;
+
+                            pixelsWrote++;
+                        }
+
+                        if (pixelsWrote > 0) {
+                            if (!isSingle) {
+                                outDv.setUint16(outSizePos, pixelsWrote * 5);
+                            }
+
+                            broadcastQueue.curOffset = virtOffset;
+                        }
+
+                        break;
                     }
+                    case PLACE_TYPE.pixelsRect: {
+                        let flags = dv.getUint8(2) & CLIENT_ALLOWED_FLAGS;
+                        const takeOwnership = !!(flags & PIXEL_FLAG_MASK.takeOwnership);
+                        const usesMask = !!(flags & PIXEL_FLAG_MASK.usesMask);
+                        const isProtect = !!(flags & PIXEL_FLAG_MASK.isProtect);
 
-                    if (isProtect && isTrusted) {
-                        client.canvas.chunkManager.setPixelProtected(x, y, clr);
-                    } else {
-                        client.canvas.chunkManager.setChunkPixel(x, y, clr, !isApiSocket); // <-- do not backup apisocket pixels
-                        client.canvas.chunkManager.setPlacerDataRaw(x, y, client.placeInfoFlag, client.placeInfoNumber);
+                        if (!takeOwnership && !isMod) {
+                            client.sendReload();
+                            client.kill();
+                            return;
+                        }
+
+                        const x = dv.getUint16(3);
+                        const y = dv.getUint16(5);
+                        const w = dv.getUint16(7);
+                        const h = dv.getUint16(9);
+
+                        if (w === 0 || h === 0 || x + w > realWidth || y + h > realHeight) {
+                            client.weirds += 1;
+                            break;
+                        }
+
+                        let dataOffset = 11;
+                        let mask = null;
+                        let expectedColors = w * h;
+
+                        if (usesMask) {
+                            const maskBytes = Math.ceil((w * h) / 8);
+                            if (dataOffset + maskBytes > dv.byteLength) {
+                                client.sendReload();
+                                client.kill();
+                                return;
+                            }
+                            mask = new Uint8Array(message.buffer, message.byteOffset + dataOffset, maskBytes);
+                            dataOffset += maskBytes;
+
+                            expectedColors = 0;
+                            for (let i = 0; i < w * h; i++) {
+                                if (mask[i >> 3] & (1 << (7 - (i & 7)))) {
+                                    expectedColors++;
+                                }
+                            }
+                        }
+
+                        if (dataOffset + expectedColors > dv.byteLength) {
+                            client.sendReload();
+                            client.kill();
+                            return;
+                        }
+
+                        if (!client.bucket.spend(expectedColors)) {
+                            break;
+                        }
+
+                        const colors = new Uint8Array(message.buffer, message.byteOffset + dataOffset, expectedColors);
+                        let colorIdx = 0;
+                        let pixelsWrote = 0;
+
+                        for (let i = 0; i < w * h; i++) {
+                            if (usesMask && !(mask[i >> 3] & (1 << (7 - (i & 7))))) {
+                                continue;
+                            }
+
+                            const px = x + (i % w);
+                            const py = y + Math.floor(i / w);
+                            const c = colors[colorIdx++];
+
+                            if (c > maxClrId) {
+                                client.weirds += 1;
+                                continue;
+                            }
+
+                            if (!isTrusted) {
+                                const oldPixel = client.canvas.chunkManager.getChunkPixel(px, py);
+                                if (oldPixel & 0x80) continue;
+                            }
+
+                            if (isProtect && isTrusted) {
+                                client.canvas.chunkManager.setPixelProtected(px, py, c);
+                            } else {
+                                client.canvas.chunkManager.setChunkPixel(px, py, c, !isApiSocket);
+                                if (takeOwnership || !isMod) {
+                                    client.canvas.chunkManager.setPlacerDataRaw(px, py, client.placeInfoFlag, client.placeInfoNumber);
+                                }
+                            }
+                            pixelsWrote++;
+                        }
+
+                        if (pixelsWrote > 0) {
+                            // const shouldCompress = 
+                            const serverFlags = flags & SERVER_ALLOWED_FLAGS;
+                            const payloadSize = dv.byteLength - 3;
+                            const outBuf = Buffer.allocUnsafe(5 + payloadSize);
+
+                            outBuf.writeUInt8(OPCODES.place, 0);
+                            outBuf.writeUInt8(PLACE_TYPE.pixelsRect, 1);
+                            outBuf.writeUInt16BE(client.id, 2);
+                            outBuf.writeUInt8(serverFlags, 4);
+
+                            message.copy(outBuf, 5, 3);
+
+                            // this.broadcastRect(outBuf); 
+                        }
+
+                        break;
                     }
-
-
                 }
-
-                if (!isApiSocket) message.writeUInt32BE(client.id, 2);
-
-                this.broadcastForCanvasFast(client.canvas, message);
 
                 break
-            }
-            case OPCODES.canvas: {
-                if (client.canvas) return;
-
-                const canvas = message.readUInt8(1);
-
-                if (canvas < 0 || canvas >= this.canvases.length) {
-                    return client.sendError('Wrong canvas number');
-                }
-
-                if (!this.checkCanvasRequires(client, this.canvases[canvas]))
-                    return client.sendError('Access for this canvas is restricted');
-
-                client.canvas = this.canvases[canvas];
-
-                let cooldown;
-                if (client.user) {
-                    if (client.user.role === 'BANNED') {
-                        client.kill()
-                    }
-                    if (client.user.role == 'ADMIN')
-                        cooldown = [0, 32]
-                    else {
-                        cooldown = client.canvas.cooldown[client.user.role];
-                    }
-                } else {
-                    cooldown = client.canvas.cooldown.GUEST
-                }
-
-                client.bucket = new Bucket(...cooldown);
-
-                this.onCanvasChosen(client.canvas, client);
-
-                break
-            }
-
-            // only for apisocket for the moment
-            // note: THIS IS TEMPORARY
-            case OPCODES.pastePixels: {
-                if (!client.user.isApiSocket) return;
-
-                const startX = message.readUInt16BE(1);
-                const startY = message.readUInt16BE(3);
-                const width = message.readUInt16BE(5);
-
-
-                zlib.inflate(message.slice(7), (err, result) => {
-                    if (err) {
-                        logger.error(`pastePixels deflate error: ${err.message}`);
-                        return;
-                    }
-
-                    const u8a = new Uint8Array(result);
-
-                    for (let i = 0; i < u8a.length; i++) {
-                        const posX = startX + (i % width);
-                        const posY = startY + Math.floor(i / width);
-
-                        const col = u8a[i];
-
-                        client.canvas.chunkManager.setChunkPixel(posX, posY, col);
-                    }
-                });
-
-                this.broadcastForCanvasFast(client.canvas, message);
-            }
-
-            case OPCODES.ping: {
-                client.emit('pong');
-                break;
             }
         }
     }
@@ -553,10 +590,12 @@ class Server {
 
                 break
             }
+
+
             case STRING_OPCODES.chatMessage: {
                 if (!this.checkUser(client) ||
                     !this.checkCaptcha(client) ||
-                    !msg.msg || msg.ch === undefined
+                    !msg?.msg.text || msg.ch === undefined
                 ) return;
 
                 const channel = this.channels[msg.ch];
@@ -567,7 +606,9 @@ class Server {
                 }
 
                 const nick = client.user.name;
-                const message = msg.msg.trim();
+                const message = msg.msg.text.trim();
+                const replyingTo = msg.msg.replyTo;
+                if (replyingTo !== null && !isPositiveNumber(replyingTo)) return;
 
                 let maxLen = 200, user = client.user;
                 switch (true) {
@@ -600,15 +641,23 @@ class Server {
                     return
                 }
 
-                const chatMessage = channel.addMessage(nick, message);
+                const chatMessage = channel.addMessage(
+                    nick,
+                    message,
+                    false,
+                    Date.now(),
+                    replyingTo
+                );
 
                 const packet = createStringPacket.chatMessage(chatMessage, channel.name);
                 this.broadcastString(JSON.stringify(packet), receiver => {
                     return receiver.subscribedChs.includes(channel)
-                })
+                });
 
                 break
             }
+
+            
             case STRING_OPCODES.alert: {
                 if (!this.checkUser(client) ||
                     ROLE[client.user.role] < ROLE.MOD
@@ -646,6 +695,10 @@ class Server {
                 break;
             }
         }
+    }
+
+    broadcastRect(rect, canvas) {
+
     }
 
 
@@ -711,32 +764,24 @@ class Server {
     onChatSubscribed(ch, client) {
         logger.debug(client.ip + ' subscribed ' + ch.name);
 
-        // this single instance is used all below
-        const message = createStringPacket.chatMessage({}, ch.name);
-
+        const messagesPacketsArr = [];
         ch.getMessages().forEach(msg => {
-            message.nick = msg.name;
-            message.msg = msg.message;
-            message.time = msg.time;
-            message.server = msg.isServer;
-
-            client.send(JSON.stringify(message));
+            const packet = createStringPacket.chatMessage(msg, ch.name);
+            messagesPacketsArr.push(packet);
         });
 
-        if (this.MOTD) {
-            // change to motd
-            message.nick = '';
-            message.server = true;
-            message.msg = '[b]MOTD: ' + this.MOTD + '[/b]';
-            client.send(JSON.stringify(message));
-        } else {
-            // change to welcome
-            message.nick = '';
-            message.server = true;
+        const motdText = this.MOTD ? ('[b]MOTD: ' + this.MOTD + '[/b]') : (`Welcome to the [#00f986]Goroxels 2.0[], server ${ch.name}!`)
+        messagesPacketsArr.push(
+            createStringPacket.chatMessage({
+                name: '',
+                message: motdText,
+                isServer: true,
+                time: Date.now()
+            }, ch.name)
+        );
 
-            message.msg = `Welcome to the [#00f986]Goroxels[], server ${ch.name}!`;
-            client.send(JSON.stringify(message));
-        }
+        const messagesBatch = createStringPacket.batch(messagesPacketsArr);
+        client.send(JSON.stringify(messagesBatch));
     }
 
     sendServerMessage(message, channel, addToLog = true) {
@@ -783,27 +828,28 @@ class Server {
         const packet = createStringPacket.userJoin(client);
         client.joinTime = Date.now();
 
-        // send join to all clients on this canvas
         if (!client.user || !client.user.isApiSocket)
-            this.broadcastString(JSON.stringify(packet), CONDITION.sameCanvas(client));
+            this.broadcastString(JSON.stringify(packet), CONDITION.sameCanvas(client, true));
+
+        // new ME packet
+        packet.user.isMe = true;
+        client.send(JSON.stringify(packet));
+
+        const userPacketsArr = [];
 
         this.clients.forEach(_client => {
             if (_client.user && _client.user.isApiSocket) return;
 
-            if (_client == client) {
-                const mePacket = createStringPacket.me(client.id);
-                client.send(JSON.stringify(mePacket));
-            } else if (_client.canvas === canvas) {
-                packet.nick = _client.user ? _client.user.name : null;
-                packet.userId = _client.user ? _client.user.id : null;
-
-                packet.id = _client.id;
-                packet.registered = !!_client.user;
-                packet.role = _client.user ? _client.user.role : null;
-
-                client.send(JSON.stringify(packet));
+            if (_client !== client && _client.canvas === canvas) {
+                const userJoinPacket = createStringPacket.userJoin(_client);
+                userPacketsArr.push(userJoinPacket);
             }
         });
+
+        if (userPacketsArr.length > 0) {
+            const usersBatch = createStringPacket.batch(userPacketsArr);
+            client.send(JSON.stringify(usersBatch));
+        }
 
         this.broadcastOnline();
     }
@@ -828,13 +874,14 @@ class Server {
     }
 
     ping() {
-        this.clients.forEach(client => {
+        for (const client of this.clients.values()) {
             if (!client.isAlive) {
-                return client.kill();
+                console.log('killing', Date.now());
+                client.kill();
+                this.clients.delete(client.id);
             }
-            client.ping();
             client.isAlive = false;
-        })
+        }
     }
 
     updateOnlineStats() {

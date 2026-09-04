@@ -109,6 +109,9 @@ router.post('/wipe', async (req, res) => {
 })
 
 router.post('/enlarge', async (req, res) => {
+    // not saving shared config rn
+    return res.error('/enlarge is unavailable for now');
+
     const cid = +req.query.canvas;
     if (!validateCanvasId(cid))
         return res.error('invalid canvas id')

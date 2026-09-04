@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize');
 
-const sequelize = require('../index');
+const { sequelize } = require('../index');
 
 const User = sequelize.define('user', {
     id: {
@@ -94,10 +94,6 @@ const Badge = sequelize.define('badge', {
     timestamps: false
 });
 
-User.belongsToMany(Badge, { through: 'UserBadges' });
-Badge.belongsToMany(User, { through: 'UserBadges' });
-
-User.sync();
 
 module.exports = {
     User,

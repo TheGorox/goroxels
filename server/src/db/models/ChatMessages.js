@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize');
 
-const sequelize = require('../index');
+const { sequelize } = require('../index');
 
 const ChatMessages = sequelize.define('chatMessage', {
     channelName: {
@@ -17,7 +17,5 @@ const ChatMessages = sequelize.define('chatMessage', {
     createdAt: 'creationDate',
     updatedAt: 'updateDate',
 });
-
-ChatMessages.sync();
 
 module.exports = ChatMessages

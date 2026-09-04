@@ -66,7 +66,7 @@ router.get('/check',
                 return value;
             }
         })
-        .isArray({ min: 1 }).withMessage('Hashes must be a non-empty array')
+        .isArray({ min: 1 }).withMessage('Hashes must be a non-empty array <= 32 elements')
         .bail()
         .custom(value => {
             return value.every(item =>
@@ -136,8 +136,8 @@ router.get('/check',
             }
             const hash = req.query.hashes[i / 2];
 
-            // new Number maps true/false to 1/0
-            checkResults[i / 2] = new Number(await canvas.chunkManager.checkChunkHash(cx, cy, hash));
+            // Number maps true/false to 1/0
+            checkResults[i / 2] = Number(await canvas.chunkManager.checkChunkHash(cx, cy, hash));
         }
 
         res.set("Cache-Control", "no-cache, no-store");

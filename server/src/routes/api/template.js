@@ -14,8 +14,8 @@ const { ROLE } = require('../../constants');
 const logger = require('../../logger')('API/TEMPLATE');
 
 const router = express.Router();
-
-const dataPath = path.join(__dirname, '../../../data');
+ 
+const dataPath = path.resolve(__dirname, '../../../data');
 const patternsPath = path.join(dataPath, 'templates/patterns');
 const thumbnailsPath = path.join(dataPath, 'templates/thumb');
 

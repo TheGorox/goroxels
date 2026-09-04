@@ -1,0 +1,47 @@
+export default {
+    login_or_register: 'войти/зарегистрироваться',
+    emoji: 'эмодзи',
+    stickers: 'стикеры',
+    uploadContainerText: 'Выбери изображение',
+    w: {
+        help: {
+            title: 'Помощь'
+        },
+        bugreport: {
+            title: 'Сообщить об ошибке'
+        },
+        settings: {
+            title: 'Настройки',
+            
+            general: 'Общие',
+            user: 'Пользователи',
+            hotkeys: 'Хоткеи',
+            admin: 'Админка',
+
+            nicknameChanged: 'Никнейм успешно изменён на "{name}"!'
+        },
+        screenshot: {
+            title: 'Скриншот полотна',
+            startX: 'Начало X:',
+            startY: 'Начало Y:',
+            endX: 'Конец X:',
+            endY: 'Конец Y:',
+            wholeCanvas: 'Всё полотно',
+            visibleArea: 'Видимая область',
+            doScreenshot: 'Сделать скриншот'
+        },
+        login: {
+            title: ''
+        }
+    },
+    chat: {
+        placeholder: 'введите сообщение...',
+        players: 'игроки',
+        channels: 'каналы',
+        general: 'общий',
+    },
+    errors: {
+        'genericApi': 'Ошибка API:  {msg}'
+    },
+
+}

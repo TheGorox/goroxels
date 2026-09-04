@@ -1,48 +1,7 @@
-const {
-    packPixel,
-    unpackPixel
-} = require('./utils')
+const { STRING_OPCODES, OPCODES } = require('../../shared/protocol.js');
 
-const OPCODES = {
-    chunk:       0x0,
-    place:       0x1,
-    online:      0x2,
-    canvas:      0x3,
-    pixels:      0x4,
-    captcha:     0x5,
-    ping:        0x6,
-    placeBatch:  0x7,
-    updateRadio: 0x8,
-    pastePixels: 0x9
-}
-
-const STRING_OPCODES = {
-    error: 'e',
-    userJoin: 'u',
-    userLeave: 'l',
-    subscribeChat: 's',
-    chatMessage: 'c',
-    alert: 'a',
-    me: 'm', // rn used only to get my id
-    reload: 'r',
-    reloadChunks: 'rc'
-}
 
 const createPacket = {
-    chunkSend: (x, y, compressedData) => {
-        // Warning: max x/y cord is 0xFF=255
-        // to increase, change data type from uint8 to uint16 (offsets too)
-        // btw max canvas coord is 4095, as designed at packPixel()
-        // upd: modified to 8192
-        const buf = Buffer.allocUnsafe(1 + 1 + 1 + compressedData.byteLength);
-        buf.writeUInt8(OPCODES.chunk, 0);
-        buf.writeUInt8(x, 1);
-        buf.writeUInt8(y, 2);
-        buf.set(compressedData, 3);
-
-        return buf
-    },
-
     pixelSendQueueBufferSize: 9,
     pixelSendEnqueue: (x, y, col, uid, targBuffer, targBufferOffset) => {
         const offs = targBufferOffset;
@@ -90,15 +49,24 @@ const createStringPacket = {
             errors: errors
         }
     },
+    batch: (packets) => {
+        return {
+            c: STRING_OPCODES.batch,
+            packets
+        }
+    },
     userJoin: (client) => {
         return {
             c: STRING_OPCODES.userJoin,
-            nick: client.user ? client.user.name : null,
-            userId: client.user ? client.user.id : null,
-            id: client.id,
-            registered: !!client.user,
-            role: client.user ? client.user.role : null,
-            badges: client.user ? client.user.badges : null
+            user: {
+                nick: client.user ? client.user.name : null,
+                userId: client.user ? client.user.id : null,
+                id: client.id,
+                registered: !!client.user,
+                role: client.user ? client.user.role : null,
+                badges: client.user ? client.user.badges : null,
+                isMe: false
+            }
         }
     },
     userLeave: (client) => {
@@ -112,9 +80,11 @@ const createStringPacket = {
             c: STRING_OPCODES.chatMessage,
             nick: message.name,
             msg: message.message,
+            id: message.id ?? Math.random(),
+            replyingTo: message.replyingTo,
             time: message.time,
             server: message.isServer,
-            ch: channel
+            ch: channel,
         }
     },
     alert(message, type=0){
@@ -143,16 +113,8 @@ const createStringPacket = {
     }
 }
 
-const unpackPacket = {
-    pixel: (buffer) => {
-        return unpackPixel(message.readUInt32BE(1))
-    }
-}
-
 module.exports = {
-    OPCODES,
-    STRING_OPCODES,
     createPacket,
     createStringPacket,
-    unpackPacket
+    // unpackPacket
 }

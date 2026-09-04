@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize');
 
-const sequelize = require('../index');
+const { sequelize } = require('../index');
 
 const Song = sequelize.define('song', {
     id: {
@@ -39,7 +39,5 @@ const Song = sequelize.define('song', {
     createdAt: 'creationDate',
     updatedAt: 'updateDate',
 });
-
-Song.sync()
 
 module.exports = Song

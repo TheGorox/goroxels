@@ -27,13 +27,14 @@ config.public.canvases.forEach((canvas, i) => {
 })
 global.canvases = canvases;
 
-db.sync().then(() => {
+db.initDB().then(() => {
     server.startServer(config.port);
 
-    radioServer.init().then(started => {
-        if(!started)
-            logger.warn('Cannot start radio server (maybe requirements not match)');
-    });
+    // no radio for now
+    // radioServer.init().then(started => {
+    //     if(!started)
+    //         logger.warn('Cannot start radio server (maybe requirements not match)');
+    // });
 
     setInterval(unbanJob, 60000);
 }).catch(err => {

@@ -1,7 +1,6 @@
 const Sequelize = require('sequelize');
 
-const sequelize = require('../index');
-const { User } = require('./User');
+const { sequelize } = require('../index');
 
 const Blacklist = sequelize.define('blacklist', {
     ip: {
@@ -18,9 +17,5 @@ const Blacklist = sequelize.define('blacklist', {
     updatedAt: false
 });
 
-Blacklist.belongsTo(User, {
-    foreignKey: 'addedBy'
-});
-Blacklist.sync();
 
 module.exports = Blacklist

@@ -21,14 +21,16 @@ ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot`;
 
 const devFile = fs.readFileSync(basePath).toString()
         .replace('#SSL_BLOCK_REPLACER', sslBlockDev)
-        .replaceAll('HTTP_PORT_REPLACEME', HTTP_PORT);
+        .replaceAll('HTTP_PORT_REPLACEME', HTTP_PORT)
+        .replaceAll('PATH_TO_APP', 'D:/Shared/scripts/other/goroxels/monorepo/server');
 fs.writeFileSync(devPath, devFile);
 
 const prodFile = fs.readFileSync(basePath).toString()
         .replace('#SSL_BLOCK_REPLACER', sslBlockProd)
         .replaceAll('HTTP_PORT_REPLACEME', HTTP_PORT)
-        .replaceAll('logs/access.log', '/var/log/nginx/access_rate_limit.log');
+        .replaceAll('logs/access.log', '/var/log/nginx/access_rate_limit.log')
+        .replaceAll('PATH_TO_APP', '/usr/goroxels');
 fs.writeFileSync(prodPath, prodFile);
 
-const devNginxPath = 'H:/nginx/conf/nginx.conf';
+const devNginxPath = 'D:/Shared/nginx/conf/nginx.conf';
 fs.writeFileSync(devNginxPath, devFile);

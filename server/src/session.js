@@ -1,7 +1,7 @@
 const expressSession = require('express-session');
 const Store = require('connect-session-sequelize')(expressSession.Store);
 
-const sequelize = require('./db/index');
+const { sequelize } = require('./db');
 const {
     MONTH
 } = require('./constants');
