@@ -121,7 +121,7 @@ class BrushTool {
     onpointermove(e) {
         this.onMove(e);
     }
-    
+
     onpointerdrag(e) {
         this.onMove(e);
 
@@ -146,18 +146,43 @@ class BrushTool {
         const pixelsCount = pixels.length / 2;
         const pixelsWithColors = new Array(pixelsCount * 3).fill(0);
 
+        const canOverwriteProtection = false; // FIXME
+
+        let k = 0, shouldBlinkProtection = false;
         for (let i = 0, j = 0; i < pixelsWithColors.length; i += 3, j += 2) {
             const x = pixels[j];
             const y = pixels[j + 1];
-            const c = player.getColorByCoord(x, y);
+            const playerCol = player.getColorByCoord(x, y);
 
-            pixelsWithColors[i] = x;
-            pixelsWithColors[i + 1] = y;
-            pixelsWithColors[i + 2] = c;
+            let boardCol, isProtected;
+            if(canOverwriteProtection){
+                boardCol = this.core.chunkManager.getPixel(x, y, true)
+            }else {
+                [boardCol, isProtected] = this.core.chunkManager.getPixel(x, y, true, true);
+                if(isProtected){
+                    shouldBlinkProtection = true;
+                    continue;
+                }
+            }
+
+            if (boardCol === this.core.config.colorsBGR[playerCol]) continue;
+
+            if (!player.bucket?.spend(1)) {
+                break;
+            }
+
+            pixelsWithColors[k] = x;
+            pixelsWithColors[k + 1] = y;
+            pixelsWithColors[k + 2] = playerCol;
+            k += 3;
+
         }
+        pixelsWithColors.length = k;
 
-        this.core.chunkManager.setPixels(pixelsWithColors, true)
-        socket.sendPixels(pixelsWithColors, 0)
+        if (pixelsWithColors.length === 0) return;
+
+        this.core.chunkManager.setPixels(pixelsWithColors, false)
+        socket.sendPixels(pixelsWithColors)
     }
 
     isLongTap() {
@@ -182,14 +207,25 @@ class BrushTool {
 
         const palette = this.core.config.colorsBGR;
 
-        const generationalSize = size % 2 === 0 ? size - 1 : size; // shapes.filledCircle doesn't support even sizes, so we generate odd and then crop
+        const generationalSize = size % 2 === 0 ? size - 1 : size;
 
         const circle = fixedBrushes[size] || shapes.filledCircle(0, 0, Math.floor(generationalSize / 2 + 1));
 
-        const offset = Math.floor(size / 2 - 0.5);
+        const sortedCircle = new Int32Array(circle.length);
+        const temp = [];
         for (let i = 0; i < circle.length; i += 2) {
-            const x = circle[i] + offset;
-            const y = circle[i + 1] + offset;
+            temp.push({ x: circle[i], y: circle[i + 1], d: circle[i] * circle[i] + circle[i + 1] * circle[i + 1] });
+        }
+        temp.sort((a, b) => a.d - b.d);
+        for (let i = 0; i < temp.length; i++) {
+            sortedCircle[i * 2] = temp[i].x;
+            sortedCircle[i * 2 + 1] = temp[i].y;
+        }
+
+        const offset = Math.floor(size / 2 - 0.5);
+        for (let i = 0; i < sortedCircle.length; i += 2) {
+            const x = sortedCircle[i] + offset;
+            const y = sortedCircle[i + 1] + offset;
             const idx = y * size + x;
             const color = palette[player.getColorByCoord(x, y)];
             u32view[idx] = color;
@@ -200,7 +236,7 @@ class BrushTool {
 
         this.lastImData = imData;
         this.lastOffset = [offset, offset];
-        this.brushShape = circle;
+        this.brushShape = sortedCircle;
 
         this.updateCoreBrush();
     }

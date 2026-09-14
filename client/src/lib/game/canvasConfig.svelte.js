@@ -15,6 +15,7 @@ export const config = $state({
     colorsBGR:   [], // for fast pixel replacements
     colorsBGRtoIdx:   new Map(),
     colorsHex:   [], // for css
+    cooldowns: {},
     shared:      {}  // shared config for this canvas, if needed
 });
 
@@ -39,6 +40,8 @@ export function initConfig() {
     config.boardHeight = canvCfg.chunkSize * canvCfg.boardHeight;
     config.chunksX = canvCfg.boardWidth;
     config.chunksY = canvCfg.boardHeight;
+
+    config.cooldowns = canvCfg.cooldown;
 
     preparePalettes(config, canvCfg.palette);
 

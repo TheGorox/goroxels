@@ -1,6 +1,5 @@
 const zlib = require('zlib');
 
-const ms = require('ms');
 const WebSocket = require('ws');
 const { Server: WebSocketServer } = require('ws');
 
@@ -214,6 +213,10 @@ class Server {
         objPixelQueueRef.buffer.writeUint8(OPCODES.place, 0);
         objPixelQueueRef.buffer.writeUint8(PLACE_TYPE.pixels, 1);
 
+        if(objPixelQueueRef.curOffset === 0){
+            objPixelQueueRef.curOffset = 2;
+        }
+
         clearInterval(objPixelQueueRef.interval);
         objPixelQueueRef.interval = setInterval(() => {
             this.flushPixelQueue(canvas);
@@ -271,12 +274,13 @@ class Server {
     }
 
     onmessage(client, ev) {
-        logger.debug('msg type = ' + JSON.stringify(ev));
+        if(client.terminated) return;
 
         if (ev.type !== 'message') return;
 
         // ws rate limiting
         if (!client.wsBucket.spend(1)) {
+            logger.debug(`killing client ${client.id}: ws rate limit hit`);
             client.kill();
             return;
         }
@@ -284,7 +288,6 @@ class Server {
         client.isAlive = true;
 
         let message = ev.data;
-        console.log({ message }, Date.now())
 
         try {
             if (typeof message === 'string') {
@@ -315,37 +318,43 @@ class Server {
             }
 
             case OPCODES.place: {
+
                 if (!this.checkCanvas(client) ||
                     !this.checkCaptcha(client) ||
-                    !this.checkUser(client) ||
                     !this.checkDelay(client) ||
                     !this.checkShadowBan(client)) return;
 
+
+                const isGuest = !client.user;
+                
                 const clientCanvas = client.canvas;
+                
+                const isMod = !isGuest && ROLE[client.user.role] >= ROLE.MOD;
+                const isTrusted = !isGuest && ROLE[client.user.role] >= ROLE.TRUSTED;
+                const isApiSocket = !!client.user?.isApiSocket;
 
-                const isMod = ROLE[client.user.role] >= ROLE.MOD;
-                const isTrusted = ROLE[client.user.role] >= ROLE.TRUSTED;
-                const isApiSocket = client.user.isApiSocket;
-
+                const placeSubtype = message.readUInt8(1);
+                const dv = new DataView(message.buffer, message.byteOffset, message.byteLength);
+                
+                let flags = dv.getUint8(2) & CLIENT_ALLOWED_FLAGS;
+                const isProtect = !!(flags & PIXEL_FLAG_MASK.isProtect);
+                const takeOwnership = !!(flags & PIXEL_FLAG_MASK.takeOwnership);
+                const usesMask = !!(flags & PIXEL_FLAG_MASK.usesMask);
+                
                 const {
                     realWidth, realHeight
                 } = client.canvas;
                 const maxClrId = isProtect ? 1 : client.canvas.palette.length - 1;
-
-                const placeSubtype = message.readUInt8(1);
-                const dv = new DataView(message.buffer, message.byteOffset, message.byteLength);
+                
                 switch (placeSubtype) {
                     case PLACE_TYPE.pixels: {
-                        let flags = dv.getUint8(2) & CLIENT_ALLOWED_FLAGS;
-                        const takeOwnership = !!(flags & PIXEL_FLAG_MASK.takeOwnership);
-
                         if (!takeOwnership && !isMod) {
                             client.sendReload();
                             client.kill();
                             return;
                         }
 
-                        const broadcastQueue = this.broadcastPixelQueue.get(canvas);
+                        const broadcastQueue = this.broadcastPixelQueue.get(client.canvas);
                         const size = dv.byteLength - 3;
                         if (size % 5 !== 0) {
                             client.sendReload();
@@ -369,31 +378,34 @@ class Server {
                         }
 
                         const outDv = broadcastQueue.view;
-
+                        
                         // using vitual offset so we don't have to revert changes if something goes wrong
                         let virtOffset = broadcastQueue.curOffset;
+
                         outDv.setUint16(virtOffset, client.id); virtOffset += 2;
                         outDv.setUint8(virtOffset, flags & SERVER_ALLOWED_FLAGS); virtOffset += 1;
-
+                        
                         let outSizePos = virtOffset;
                         if (!isSingle) virtOffset += 2;
+
                         let pixelsWrote = 0;
 
-                        for (let i = 2; i < size; i += 5) {
+                        for (let i = 3; i < size; i += 5) {
                             const x = dv.getUint16(i);
                             const y = dv.getUint16(i + 2);
                             const c = dv.getUint8(i + 4);
-
+                            
                             if (x >= realWidth ||
                                 y >= realHeight ||
                                 c > maxClrId) {
-                                client.weirds += 1;
-                                break;
-                            };
-
-                            if (!client.bucket.spend(1)) {
-                                break;
-                            }
+                                    client.weirds += 1;
+                                    break;
+                                };
+                                
+                                if (!client.bucket.spend(1)) {
+                                    break;
+                                }
+                            
 
                             if (!isTrusted) {
                                 // check for protection
@@ -403,6 +415,7 @@ class Server {
                                 }
                             }
 
+                            
                             if (isProtect && isTrusted) {
                                 client.canvas.chunkManager.setPixelProtected(x, y, c);
                             } else {
@@ -419,6 +432,8 @@ class Server {
                             pixelsWrote++;
                         }
 
+                        console.log({pixelsWrote})
+
                         if (pixelsWrote > 0) {
                             if (!isSingle) {
                                 outDv.setUint16(outSizePos, pixelsWrote * 5);
@@ -430,10 +445,6 @@ class Server {
                         break;
                     }
                     case PLACE_TYPE.pixelsRect: {
-                        let flags = dv.getUint8(2) & CLIENT_ALLOWED_FLAGS;
-                        const takeOwnership = !!(flags & PIXEL_FLAG_MASK.takeOwnership);
-                        const usesMask = !!(flags & PIXEL_FLAG_MASK.usesMask);
-                        const isProtect = !!(flags & PIXEL_FLAG_MASK.isProtect);
 
                         if (!takeOwnership && !isMod) {
                             client.sendReload();
@@ -876,7 +887,6 @@ class Server {
     ping() {
         for (const client of this.clients.values()) {
             if (!client.isAlive) {
-                console.log('killing', Date.now());
                 client.kill();
                 this.clients.delete(client.id);
             }

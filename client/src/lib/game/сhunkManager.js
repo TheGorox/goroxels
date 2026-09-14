@@ -1,6 +1,6 @@
 import { api } from "../api";
 import Chunk from "./Chunk.svelte";
-import { queuePixelRevert } from './pixelsQueue.svelte';
+import { confirmPixel, queuePixelRevert } from './pixelsQueue.svelte';
 import { persistentPerCanvas } from "./stores/persistent.svelte";
 import { getVisibleChunks, isChunkVisible, screenToBoardSpace } from "./utils/camera";
 
@@ -314,7 +314,7 @@ export function initChunkManager(core) {
         core.renderer.requestRender();
     }
 
-    function setPixels(pixelsArr, revertTimeouted=false) {
+    function setPixels(pixelsArr, fromServer=false) {
         for (let i = 0; i < pixelsArr.length; i += 3) {
             const x = pixelsArr[i];
             const y = pixelsArr[i + 1];
@@ -330,18 +330,36 @@ export function initChunkManager(core) {
 
             const oldCol = chunk.get(offx, offy);
             
-            if(revertTimeouted)
+            if(!fromServer)
                 queuePixelRevert(x, y, oldCol);
+            else
+                confirmPixel(x, y);
 
+            console.log('set pixe', {offx, offy, colId})
             chunk.set(offx, offy, colId);
             chunk.requestRedraw(); // it's faster to call this function than to use Sets
         }
         core.renderer.requestRender();
     }
 
+    function getPixel(x, y, raw=false, withProtection=false){
+        const chunk = getChunkByPixelPos(x, y);
+        const cOffX = x % chunkSize;
+        const cOffY = y % chunkSize;
+
+        let protectionState = null;
+        if(withProtection){
+            protectionState = chunk.getProtectedState(cOffX, cOffY);
+            return [chunk.get(cOffX, cOffY, raw), protectionState];
+        }
+
+        return chunk.get(cOffX, cOffY, raw);
+    }
+
     return {
         handleInputPixels,
         getChunk,
-        setPixels
+        setPixels,
+        getPixel
     }
 }

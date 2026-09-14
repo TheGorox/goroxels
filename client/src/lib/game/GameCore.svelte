@@ -15,7 +15,7 @@
 
 	import { createOverlayRenderer } from './fx/fx.svelte.js';
 	import { WebGLFxRenderer } from './fx/glFx.svelte.js';
-	import { initGlobalCursor } from './fx/globalCursor.svelte.js';
+	import { initGlobalCursor } from './fx/shaders/globalCursor.svelte.js';
 
 	import { createToolManager } from './tools/toolManager.svelte.js';
 	import ToolPanel from '../components/ToolsPanel.svelte';
@@ -25,7 +25,7 @@
 	import Toast from '../ui/Toast.svelte';
 	import UtilityMenu from '../components/UtilityMenu.svelte';
 	import CoordsMenu from '../components/CoordsMenu.svelte';
-	import DebugMetrics from '../components/DebugMetrics.svelte';
+	import DebugMetrics from '../components/dev/DebugMetrics.svelte';
 	import Window from '../ui/Window.svelte';
 	import ReportBug from '../components/windows/ReportBug.svelte';
 
@@ -41,7 +41,9 @@
 	import icon from '$lib/assets/icons/icon_settings.svg?raw';
 	import { initGameConfig } from './gameConfig.svelte.js';
 	import { getStickerpacks } from '../api/stickers.js';
-	import { processPendingPixels } from './pixelsQueue.svelte.js';
+	import { confirmPixel, processPendingPixels } from './pixelsQueue.svelte.js';
+	import { emitter } from './events.js';
+	import Palette from '../components/Palette.svelte';
 
 	// loading config is the first thing we want to do
 	// anything else can be done after mount
@@ -159,6 +161,16 @@
 
 		core.chunkManager = initChunkManager(core);
 
+        emitter.on('sock.me', (me) => {
+            const role = me.role ?? 'GUEST';
+            const myCooldown = cfg.cooldowns[role];
+            player.updateBucket(myCooldown[0], myCooldown[1]);
+        });
+
+        emitter.on('sock.pixels', (pixels) => {
+            core.chunkManager.setPixels(pixels.pixels, true);
+        });
+
 		// it's not in the renderer itself because we have multiple renderers
 		function renderLoop() {
 			processPendingPixels();
@@ -209,6 +221,7 @@
 	<UtilityMenu />
 	<CoordsMenu />
 	<DebugMetrics />
+    <Palette bottom={60} right={10} />
 </div>
 
 <Toast />

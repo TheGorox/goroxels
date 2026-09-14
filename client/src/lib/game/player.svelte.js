@@ -1,5 +1,6 @@
 import { emitter } from './events.js';
 import { persistent, persistentPerCanvas } from './stores/persistent.svelte.js';
+import Bucket from './utils/Bucket.js';
 
 class Player {
     palette = null;

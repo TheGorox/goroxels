@@ -27,6 +27,8 @@ class Client extends EventEmitter {
         this.bucket = null;
         this.wsBucket = new Bucket(15, 50, true);
 
+        this.terminated = false;
+
         this.canvas = null;
 
         this.id = ++Client.lastId;
@@ -56,6 +58,8 @@ class Client extends EventEmitter {
 
     set weirds(newValue){
         this.#weirds = newValue;
+        logger.debug('adding weird:');
+        console.trace();
         if(this.#weirds > 5){
             logger.warn(`Killing client ${this.id} (${this.user?.username || 'Unknown'}|${this.ip}) for weirdness (weirds: ${this.#weirds})`);
             this.sendReload();
@@ -94,8 +98,8 @@ class Client extends EventEmitter {
     }
 
     kill() {
-        logger.debug(`killing this client (${this.id})`)
         this.socket.close();
+        this.terminated = true;
     }
 
     ping() {
@@ -119,6 +123,8 @@ class Client extends EventEmitter {
     sendReload(){
         const str = JSON.stringify({ c: STRING_OPCODES.reload });
         this.send(str);
+        logger.debug('sending reload');
+        console.trace();
     }
 }
 

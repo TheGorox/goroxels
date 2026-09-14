@@ -2,8 +2,8 @@
 // but rather a fx of the brush/line/other tool that should render it's borders
 
 import { tick } from 'svelte';
-import { player } from '../player.svelte.js';
-import { boardToScreenSpace } from '../utils/camera.js';
+import { player } from '../../player.svelte.js';
+import { boardToScreenSpace } from '../../utils/camera.js';
 
 export function initGlobalCursor(core) {
     const cursorShader = `#version 300 es

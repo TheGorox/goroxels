@@ -1,12 +1,14 @@
 <script>
     import { onMount } from 'svelte';
+	import { player } from '../../game/player.svelte';
 
     let fps = $state(0);
     let frameTime = $state(0);
     let memory = $state({ used: 0, total: 0 });
     let lastTime = performance.now();
     let frames = 0;
-
+    
+    let statedBucketAllowance = $state(0);
     function updateMetrics() {
         const now = performance.now();
         frames++;
@@ -25,12 +27,22 @@
             }
         }
 
+        statedBucketAllowance = player.bucket?._allowance.toFixed(0) ?? '??';
+
         requestAnimationFrame(updateMetrics);
     }
 
+
     onMount(() => {
         const handle = requestAnimationFrame(updateMetrics);
-        return () => cancelAnimationFrame(handle);
+
+        const bucketUpdateInterval = setInterval(() => {
+            player.bucket?.allowance;
+        }, 300);
+        return () => {
+            cancelAnimationFrame(handle);
+            clearInterval(bucketUpdateInterval);
+        }
     });
 </script>
 
@@ -49,6 +61,11 @@
             <span class="value">{memory.used} / {memory.total} MB</span>
         </div>
     {/if}
+    <hr>
+    <div class="metric">
+        <span class="label">Bucket:</span>
+        <span class="value">{statedBucketAllowance}</span>
+    </div>
 </div>
 
 <style>

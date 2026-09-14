@@ -72,11 +72,16 @@ export default class Chunk {
         this.view[i] = bgrPalette[col];
     }
     
-    get(x, y) {
+    get(x, y, raw=false) {
         const bgrToIdx = this.core.config.colorsBGRtoIdx;
         
         const i = x + y * this.width;
-        return bgrToIdx.get(this.view[i]);
+        return raw ? this.view[i] : bgrToIdx.get(this.view[i]);
+    }
+    
+    getProtectedState(x, y){
+        const i = x + y * this.width;
+        return this.pView[i] === 0;
     }
 
 
