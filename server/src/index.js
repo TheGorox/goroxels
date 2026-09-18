@@ -1,4 +1,7 @@
 require('./dotenv');
+if(process.argv[2] === 'dev'){
+    process.env.DEV  = true;
+}
 
 const config = require('./config');
 const { MINUTE } = require('./constants');
@@ -9,6 +12,7 @@ const radioServer = require('./music-radio/server');
 
 // the module below will also configure loggers
 const logger = require('./logger')('MAIN', 'info');
+
 
 const unbanJob = require('./jobs/unban');
 

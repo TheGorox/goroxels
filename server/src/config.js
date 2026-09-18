@@ -1,5 +1,10 @@
 
-const publicConfig = require('../../shared/config.export.cjs');
+let publicConfig = require('../../shared/config.js').default;
+const publicTestConfig = require('../../shared/config.test.js').default;
+if(process.env.DEV){
+    publicConfig = publicTestConfig;
+}
+
 
 const config = {
     port: 80,

@@ -335,7 +335,6 @@ export function initChunkManager(core) {
             else
                 confirmPixel(x, y);
 
-            console.log('set pixe', {offx, offy, colId})
             chunk.set(offx, offy, colId);
             chunk.requestRedraw(); // it's faster to call this function than to use Sets
         }

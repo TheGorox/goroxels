@@ -1,5 +1,9 @@
-import sharedConfig from '$shared/config.export';
+import sharedConfigProd from '$shared/config';
+import sharedConfigTest from '$shared/config.test';
 import { rgb2abgr, rgb2hex } from './utils/color';
+
+const DEV = import.meta.env.MODE === 'development';
+const sharedConfig = DEV ? sharedConfigTest : sharedConfigProd;
 
 let initialized = false;
 

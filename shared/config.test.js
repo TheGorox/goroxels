@@ -71,8 +71,8 @@ export default {
     "canvases": [{
         "name": "main",
         "cooldown": {
-            "GUEST": [100, 25],
-            "USER": [30, 40],
+            "GUEST": [30, 25],
+            "USER": [10, 40],
             "TRUSTED": [0, 32],
             "MOD": [0, 32]
         },
