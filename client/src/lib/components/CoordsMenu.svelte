@@ -4,6 +4,7 @@
 
 	import screenshotIcon from '$lib/assets/icons/icon_camera.svg?raw';
 	import gridIcon from '$lib/assets/icons/icon_grid.svg?raw';
+	import shieldIcon from '$lib/assets/icons/shield.svg?raw';
 
 	import { useGameCore } from '../game/core.svelte';
 	import { clamp } from '../game/utils/math';
@@ -21,6 +22,8 @@
 	function formatY(y) {
 		return clamp(Math.floor(y), 0, core.config?.boardHeight).toString().padStart(4, '0');
 	}
+
+	$inspect(core.ui?.showProtection.v);
 </script>
 
 <div class="utilityMenu">
@@ -38,6 +41,13 @@
 					active={core.toolManager?.tools.grid.isActive}
 					onclick={() => core.toolManager?.tools.grid.onUp()}
 					icon={gridIcon}
+				/>
+				<div class="vr"></div>
+
+				<IconButton
+					active={core.ui?.showProtection.v}
+					onclick={() => core.ui.showProtection.v = !core.ui.showProtection.v}
+					icon={shieldIcon}
 				/>
 				<div class="vr"></div>
 

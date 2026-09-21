@@ -23,9 +23,12 @@ const core = $state({
 	renderer: null,
 	chunkManager: null,
 	fx: null,
+	gl: null,
 	camera: null,
 	socket: null,
 	input: null,
+
+	blinkProtection: null,
 
 	brush: {
 		imData: null,

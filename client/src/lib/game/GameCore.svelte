@@ -10,7 +10,7 @@
 	import { socket } from './socket.svelte.js';
 	import { player } from './player.svelte.js';
 	import { online } from './online.svelte.js';
-	import { initChunkManager } from './сhunkManager.js';
+	import { initChunkManager } from './chunkManager.js';
 	import { persistent } from './stores/persistent.svelte.js';
 
 	import { createOverlayRenderer } from './fx/fx.svelte.js';
@@ -44,6 +44,9 @@
 	import { confirmPixel, processPendingPixels } from './pixelsQueue.svelte.js';
 	import { emitter } from './events.js';
 	import Palette from '../components/Palette.svelte';
+	import { notify } from '../toast.js';
+	import { t } from '../i18n/translate.svelte.js';
+	import { attachProtectionFx } from './fx/shaders/protection.svelte.js';
 
 	// loading config is the first thing we want to do
 	// anything else can be done after mount
@@ -97,6 +100,13 @@
 	}
 
 	onMount(() => {
+		setTimeout(() => {
+			const dpr = devicePixelRatio;
+			if(!Number.isInteger(dpr)){
+				notify.warning(t('uglyPixelsWarn', { values: { scale: Math.floor(dpr * 100).toString() } }));
+			}
+		}, 1000)
+
 		core.mainCanvas = canvasRef;
 
 		// init events listeners
@@ -161,10 +171,18 @@
 
 		core.chunkManager = initChunkManager(core);
 
-        emitter.on('sock.me', (me) => {
+        emitter.on('sock.me', async (me) => {
             const role = me.role ?? 'GUEST';
             const myCooldown = cfg.cooldowns[role];
             player.updateBucket(myCooldown[0], myCooldown[1]);
+
+			if(me.registered){
+				try {
+					core.stickersCache = await getStickerpacks();
+				} catch (error) {
+					console.error('failed to load stickers');
+				}
+			}
         });
 
         emitter.on('sock.pixels', (pixels) => {
@@ -183,19 +201,16 @@
 
 		try {
 			initGlobalCursor(core);
+
+			const {setIntensity} = attachProtectionFx(core);
+			core.blinkProtection = () => setIntensity(2);
+			
 		} catch (error) {
 			console.error('unexpected shader error:', error);
 		}
 
 		initRootPalette(); // ui theme
 
-		queueMicrotask(async () => {
-			try {
-				core.stickersCache = await getStickerpacks();
-			} catch (error) {
-				console.error('failed to load stickers');
-			}
-		});
 
 		window.core = core;
 

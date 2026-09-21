@@ -4,7 +4,7 @@ import { persistent } from '../game/stores/persistent.svelte.js';
 import { untrack } from 'svelte';
 import { get } from 'svelte/store';
 
-register('ru', () => import('../../locales/ru.js'));
+register('ru', () => import('./locales/ru.js'));
 
 const defaultLocale = getLocaleFromNavigator() || 'ru';
 
