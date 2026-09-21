@@ -11,7 +11,7 @@
 	let { isOpen = $bindable(true), ...rprops } = $props();
 </script>
 
-<Window title={t('login_or_register')} id="settings" bind:isOpen {...rprops}>
+<Window title={t('login_or_register')} id="login" bind:isOpen {...rprops}>
 	<div class="body">
 		<a href="/api/auth/vk">
 			<Button
