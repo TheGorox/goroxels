@@ -3,6 +3,7 @@ export default {
     emoji: 'эмодзи',
     stickers: 'стикеры',
     uploadContainerText: 'Выбери изображение',
+    uglyPixelsWarn: 'Внимание! У тебя установлен нецелый ({scale}%) масштаб в системе. Пиксели при таком масштабе будут уродливые!',
     w: {
         help: {
             title: 'Помощь'

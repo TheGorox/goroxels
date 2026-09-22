@@ -100,6 +100,7 @@ def rects_to_svg(rects, width: int, height: int) -> str:
     d = "".join(path_parts)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'width="{width}" height="{height}" '
         f'viewBox="0 0 {width} {height}" fill="currentColor">'
         f'<path d="{d}"/></svg>'
     )

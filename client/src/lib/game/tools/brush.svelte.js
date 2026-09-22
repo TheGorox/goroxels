@@ -177,8 +177,12 @@ class BrushTool {
             k += 3;
 
         }
+        
+        if(shouldBlinkProtection){
+            this.core.blinkProtection();
+        }
+        
         pixelsWithColors.length = k;
-
         if (pixelsWithColors.length === 0) return;
 
         this.core.chunkManager.setPixels(pixelsWithColors, false)

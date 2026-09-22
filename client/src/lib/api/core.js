@@ -56,6 +56,7 @@ async function apiRequest(path, config) {
             
             if (json.errors) {
                 processApiErrors(json.errors);
+                throw new Error('apiError');
             }
 
             response.json = () => json;

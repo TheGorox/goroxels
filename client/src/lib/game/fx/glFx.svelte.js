@@ -2,6 +2,9 @@ const MAX_LAYER = 4;
 
 const DEFAULT_VS = `#version 300 es
     in vec2 a_position;
+
+    precision highp float;
+    precision highp int;
     
     uniform vec4 u_rect;
     uniform vec2 u_resolution;
@@ -42,6 +45,8 @@ export class WebGLShaderEffect {
         this.gl = gl;
         this.id = id;
         this.params = initialParams;
+
+        this.update = null;
 
         this.#compile(fragmentSrc, quadBuffer);
         this.#cacheUniforms();
@@ -127,6 +132,15 @@ export class WebGLShaderEffect {
                 gl.uniform1i(loc, textureUnit);
                 textureUnit++;
             }
+            else if (info.type === gl.INT) {
+                gl.uniform1i(loc, value);
+            } else if (info.type === gl.INT_VEC2) {
+                gl.uniform2i(loc, value[0] | 0, value[1] | 0);
+            } else if (info.type === gl.INT_VEC3) {
+                gl.uniform3i(loc, value[0] | 0, value[1] | 0, value[2] | 0);
+            } else if (info.type === gl.INT_VEC4) {
+                gl.uniform4i(loc, value[0] | 0, value[1] | 0, value[2] | 0, value[3] | 0);
+            }
         }
     }
 }
@@ -171,6 +185,40 @@ export class WebGLFxRenderer {
 
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
+
+    get gl() { return this.#gl; }
+    get canvas() { return this.#canvas; }
+
+    // creates toroidal R8 texture (useful for chunks shaders)
+    createMaskTexture(size) {
+        const gl = this.#gl;
+        const max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        if (size > max) {
+            console.warn(`[WebGLFX] mask ${size} > MAX_TEXTURE_SIZE ${max}, clamping`);
+            size = 1 << Math.floor(Math.log2(max));
+        }
+
+        const texture = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R8, size, size);
+
+        const zeros = new Uint8Array(size * size);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, size, size, gl.RED, gl.UNSIGNED_BYTE, zeros);
+
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        texture.glWidth = size;
+        texture.glHeight = size;
+        
+        return texture;
     }
 
     #setupWatchers() {
@@ -235,6 +283,8 @@ export class WebGLFxRenderer {
                 gl.bindVertexArray(fx.vao);
 
                 fx.params.u_resolution = [w, h];
+
+                fx.update?.();
 
                 fx.applyUniforms();
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
