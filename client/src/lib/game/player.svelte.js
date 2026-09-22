@@ -3,7 +3,8 @@ import { persistent, persistentPerCanvas } from './stores/persistent.svelte.js';
 import Bucket from './utils/Bucket.js';
 
 class Player {
-    palette = null;
+    #savedPaletteName = $state(null);
+    palette = $derived.by(() => this.#savedPaletteName?.v);
 
     maxPlaced = persistent('maxPlaced', 5000);
     maxActions = persistent('maxActions', 5);
@@ -22,7 +23,7 @@ class Player {
     placed = $state([]);             
     bucket = $state(null);         
 
-    init() {
+    init(config) {
         // this.primaryCol = persistentPerCanvas('color1', -1);
         this.primaryCol = persistentPerCanvas('color1', 0);
         this.seconaryCol = persistentPerCanvas('color2', -1);
@@ -33,6 +34,12 @@ class Player {
             this.nickname = user.nick ?? null;
             this.isGuest = !(user.registered ?? false);
         });
+
+        this.#savedPaletteName = persistentPerCanvas('paletteName', Object.keys(config.palettes)?.[0]?.name || "");
+    }
+
+    setPalette(newPal){
+        this.#savedPaletteName.v = newPal;
     }
 
     switchColor(id) {

@@ -19,8 +19,9 @@ export const config = $state({
     colorsBGR:   [], // for fast pixel replacements
     colorsBGRtoIdx:   new Map(),
     colorsHex:   [], // for css
-    cooldowns: {},
-    shared:      {}  // shared config for this canvas, if needed
+    palettes:    {},
+    cooldowns:   {},
+    shared:      {}  // shared config, if needed
 });
 
 export function initConfig() {
@@ -48,6 +49,7 @@ export function initConfig() {
     config.cooldowns = canvCfg.cooldown;
 
     preparePalettes(config, canvCfg.palette);
+    config.palettes = canvCfg?.extra?.palettes ? Object.fromEntries(canvCfg?.extra?.palettes.map(p => [p.name, p.slice])) : {};
 
     config.shared = sharedConfig;
 

@@ -70,7 +70,7 @@ void main() {
     float period = 12.0;
     float stripe = step(0.5, fract((screen.x + screen.y) / period - u_time * 0.5));
     vec3 col = vec3(1.0, 0.25, 0.25);
-    float alpha = edge ? 0.9 : stripe * 0.35;
+    float alpha = edge ? 0.8 : stripe * 0.15;
 
     fragColor = vec4(col, alpha * u_intensity);
 }`;
@@ -271,7 +271,7 @@ export function attachProtectionFx(core, opts = {}) {
 
     let hidden = false;
     let lastPerf = performance.now();
-    let blinking = false
+    let blinking = false;
 
     // called every frame
     fx.update = () => {
@@ -297,35 +297,36 @@ export function attachProtectionFx(core, opts = {}) {
                     ProtectionAtlas.zeros(1)
                 );
                 gl.bindTexture(gl.TEXTURE_2D, null);
-
+                
                 atlas.level = -1;
             }
-
+            
             fx.params.u_mask = emptyMask;
             fx.params.u_atlasSize = 1;
+            lastPerf = performance.now();
             return;
         }
-
+        
         if (hidden) {
             hidden = false;
             atlas.level = -1;
         }
-
+        
         const w = renderer.canvas.width;
         const h = renderer.canvas.height;
-
+        
         if (!w || !h || !core.camera) return;
-
+        
         fx.params.u_resolution[0] = w;
         fx.params.u_resolution[1] = h;
-
+        
         const cam = core.camera;
         const dpr = typeof devicePixelRatio === 'number' ? devicePixelRatio : 1;
         const zoom = Math.max(1e-6, (cam.currentZoom ?? cam.zoom ?? 1) * dpr);
-
+        
         const camX = (cam.x ?? 0) - w / (2 * zoom);
         const camY = (cam.y ?? 0) - h / (2 * zoom);
-
+        
         const { L } = atlas.update(
             { x: camX, y: camY },
             zoom,
@@ -333,9 +334,9 @@ export function attachProtectionFx(core, opts = {}) {
             h,
             (cx, cy) => core.chunkManager?.getChunk?.(cx, cy) ?? null
         );
-
+        
         const now = performance.now();
-
+        
         fx.params.u_mask = atlas.texture;
         fx.params.u_camPos[0] = camX;
         fx.params.u_camPos[1] = camY;
@@ -345,7 +346,7 @@ export function attachProtectionFx(core, opts = {}) {
         fx.params.u_atlasSize = atlas.size;
         fx.params.u_borderPx = Math.max(core.camera.currentZoom / 3, 1);
         fx.params.u_time = (now * 0.001) % 1000000;
-
+        
         const minIntensity = blinking ? 0 : 1;
         if(intensity > minIntensity){
             const delta = now - lastPerf;
@@ -356,23 +357,23 @@ export function attachProtectionFx(core, opts = {}) {
         }
         lastPerf = now;
     };
-
+    
     core.atlas = atlas;
     core.proFx = fx;
-
+    
     return {
         fx,
         atlas,
-
+        
         setIntensity: (power) => {
             intensity = power;
-
+            
             // blink with hidden protection
             if(power > 1 && !core?.ui.showProtection?.v){
                 blinking = true;
             }
         },
-
+        
         detach: () => {
             renderer.removeEffect('protection');
             core.atlas = null;

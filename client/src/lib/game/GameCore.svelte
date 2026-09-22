@@ -137,7 +137,7 @@
 		const input = createInputHandler(canvasRef, camera);
 		core.input = input;
 
-		player.init();
+		player.init(cfg);
 		core.player = player;
 
 		const canvases = [canvasRef, fxCanvasRef, glCanvasRef];
