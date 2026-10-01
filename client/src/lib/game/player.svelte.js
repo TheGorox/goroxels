@@ -5,12 +5,16 @@ import Bucket from './utils/Bucket.js';
 class Player {
     #savedPaletteName = $state(null);
     palette = $derived.by(() => this.#savedPaletteName?.v);
-
+    
     maxPlaced = persistent('maxPlaced', 5000);
     maxActions = persistent('maxActions', 5);
     
-    primaryCol = null;
-    seconaryCol = null;
+    #primaryCol = $state(null);
+    primaryCol = $derived.by(() => this.#primaryCol?.v);
+
+    #seconaryCol = $state(null);
+    seconaryCol = $derived.by(() => this.#seconaryCol?.v);
+
     brushSize = null;
 
     nickname = $state('');
@@ -24,9 +28,11 @@ class Player {
     bucket = $state(null);         
 
     init(config) {
+        console.log('init');
+        
         // this.primaryCol = persistentPerCanvas('color1', -1);
-        this.primaryCol = persistentPerCanvas('color1', 0);
-        this.seconaryCol = persistentPerCanvas('color2', -1);
+        this.#primaryCol = persistentPerCanvas('color1', 0);
+        this.#seconaryCol = persistentPerCanvas('color2', -1);
         this.brushSize = persistentPerCanvas('brushSize', 1);
 
         emitter.on('sock.me', user => {
@@ -42,21 +48,20 @@ class Player {
         this.#savedPaletteName.v = newPal;
     }
 
-    switchColor(id) {
-        if (!this.primaryCol || !this.seconaryCol) return;
-
-        if (this.seconaryCol.v === id && id !== -1) this.switchSecondColor(-1);
-        if (this.primaryCol.v === id) id = -1;
-        this.primaryCol.v = id;
-
-        const core = useGameCore();
-        core.requestRender?.();
+    setPrimaryColor(id){
+        console.log(this);
+        this.#primaryCol.v = id;
     }
 
-    getColorByCoord(x, y){
-        let col1 = player.primaryCol?.v ?? -1;
-        let col2 = player.seconaryCol?.v ?? -1;
+    setSeconaryColor(id){
+        this.#seconaryCol.v = id;
+    }
 
+    
+    getColorByCoord(x, y){
+        let col1 = player.primaryCol ?? -1;
+        let col2 = player.seconaryCol ?? -1;
+        
         if (col1 === -1 && col2 !== -1) {
             col1 = col2;
         } else if (col2 === -1 && col1 !== -1) {
@@ -64,16 +69,27 @@ class Player {
         } else if (col1 === -1 && col2 === -1) {
             return -1;
         }
-
+        
         return ((x + y) % 2) === 0 ? col1 : col2;
+    }
+    
+    switchColor(id) {
+        if (!this.primaryCol || !this.seconaryCol) return;
+
+        if (this.seconaryCol === id && id !== -1) this.switchSecondColor(-1);
+        if (this.primaryCol === id) id = -1;
+        this.#primaryCol.v = id;
+
+        const core = useGameCore();
+        core.requestRender?.();
     }
 
     switchSecondColor(id) {
         if (!this.primaryCol || !this.seconaryCol) return;
 
-        if (this.primaryCol.v === id && id !== -1) this.switchColor(-1);
-        if (this.seconaryCol.v === id) id = -1;
-        this.seconaryCol.v = id;
+        if (this.primaryCol === id && id !== -1) this.switchColor(-1);
+        if (this.seconaryCol === id) id = -1;
+        this.#seconaryCol.v = id;
     }
 
     swapColors() {
@@ -88,8 +104,8 @@ class Player {
         if (!this.primaryCol || !this.seconaryCol) return;
 
         this.suspendedClrs = [this.primaryCol.v, this.seconaryCol.v];
-        this.primaryCol.v = -1;
-        this.seconaryCol.v = -1;
+        this.#primaryCol.v = -1;
+        this.#seconaryCol.v = -1;
     }
 
     restoreColors() {
