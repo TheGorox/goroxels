@@ -66,5 +66,11 @@
     "fs-extra": "^8.1.0",
     "sequelize-cli": "^6.6.3",
     "sqlite3": "^5.0.0"
+  },
+  "allowScripts": {
+    "sqlite3@5.1.7": true,
+    "sharp@0.33.5": true,
+    "bufferutil@4.1.0": true,
+    "utf-8-validate@5.0.10": true
   }
 }
