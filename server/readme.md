@@ -13,37 +13,31 @@
 - [Mysql](https://www.mysql.com/downloads/) (опционально)
 
 
-Чтобы полноценно и удобно разрабатывать гороксели, нужно чтобы папки с обоими репозиториями находились в одной общей. Имена папок должны быть *goroxels-server* и *goroxels-client*:
+Клиент и сервер лежат в одном репозитории. Для быстрой разработки достаточно одной команды из корня репозитория — HMR и проксирование API/websocket настраиваются автоматически, вручную билдить клиент и копировать его в `server/public` больше не надо:
 
 ```
-git clone https://github.com/TheGorox/goroxels-server.git ./goroxels-server
-git clone https://github.com/TheGorox/goroxels-client.git ./goroxels-client
+npm install --prefix server
+npm install --prefix client
+npm run dev
 ```
 
-После скачивания, создай файл *sharedConfig.json* в общей папке и скопируй туда содержимое с *goroxels-server*/shared/config.json. Это упростит в будущем копирование конфига в клиент и в сервер:
+`npm run dev` поднимает сразу два процесса:
+- **server** — `node src/index.js dev` (режим разработки: конфиг `config.test`, sqlite, порт `8000`);
+- **client** — vite-dev-сервер на http://localhost:5173 с HMR.
+
+Открывать в браузере нужно **vite** (http://localhost:5173): он раздаёт клиент прямо из `src` и проксирует на бэкенд `/api`, `/uploads`, `/config.json`, `/robots.txt`, `/changelog` и websocket-каналы канвасов (`/<canvasName>`).
+
+Если сервер уже запущен отдельно на другом порту, укажи клиенту его адрес через `GOROXELS_API`:
+
 ```
-cp ./goroxels-server/shared/config.json sharedConfig.json
+cd client
+GOROXELS_API=http://localhost:8000 npm run dev
 ```
 
-Выполни `npm install` в обеих папках:
-```
-npm install --prefix goroxels-server
-npm install --prefix goroxels-client
-```
+Адрес можно также прописать в файле `client/.env`.
 
-Клиент компилируется командой `npm run devBuild` в папке с клиентом.
+Собрать клиент в `server/public` (для деплоя) можно как и раньше — `npm run build` в папке `client`.
 
-Для того, чтобы в два клика компилировать клиент и перезапускать сервер, создай батник с именем, которое нравится(к примеру, start.bat) в общей папке и вставь туда 
-```
-npm run devBuild --prefix goroxels-client && ^
-cd goroxels-server && ^
-pm2 startOrRestart ecosystem.config.js --update-env && ^
-cd .. && ^
-pm2 logs goroxels
-```
-
-Теперь можно запускать это дело двойным кликом или `.\start.bat` из консоли.
-На линусе этот батник, скорее всего, не сработает, но красноглазые достаточно умны чтобы самим разобраться.
 Запускать научились. Теперь взглянем на эти прекрасные переменные окружения.
 Ниже приведены обязательные переменные(без них запуск через node не сработает):
 | ИМЯ        | ЗНАЧЕНИЕ                                                             |

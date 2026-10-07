@@ -1,6 +1,8 @@
 require('./dotenv');
 if(process.argv[2] === 'dev'){
     process.env.DEV  = true;
+    // don't require privileges for port 80 during local development
+    if(!process.env.EXPRESS_PORT) process.env.EXPRESS_PORT = '8000';
 }
 
 const config = require('./config');

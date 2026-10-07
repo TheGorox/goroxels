@@ -332,7 +332,7 @@
 		</Panel>
 	</TiltShadow>
 	<div class="submenus">
-		{@render children()}
+		{@render children?.()}
 
 		<div class="channelsDrawer" style:--offset-x={channelsDrawerOffset + 'px'}>
 			<DrawerPanel

@@ -10,6 +10,7 @@
     "#data/*": "./data/*"
   },
   "scripts": {
+    "dev": "node src/index.js dev",
     "devStart": ".\\utils\\copyPublic.bat && node src/index.js",
     "start": "node src/index.js"
   },
