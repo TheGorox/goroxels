@@ -58,6 +58,7 @@
 		}
 	}
 
+
 	async function addSticker() {
 		const currentStickerpack = core.stickersCache?.find((p) => p.title);
 		if (!currentStickerpack) return;
@@ -81,7 +82,7 @@
 	// processEnter()
 </script>
 
-<Window title={$_('w.settings.title')} id="settings" bind:isOpen noPanelBody {...rprops}>
+<Window title={_('w.settings.title')} id="settings" bind:isOpen noPanelBody {...rprops}>
 	<div class="body">
 		<Tabs
 			tabs={[

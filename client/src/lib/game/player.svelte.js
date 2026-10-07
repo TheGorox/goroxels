@@ -41,6 +41,7 @@ class Player {
             this.isGuest = !(user.registered ?? false);
         });
 
+        console.log(config.palettes);
         this.#savedPaletteName = persistentPerCanvas('paletteName', Object.keys(config.palettes)?.[0]?.name || "");
     }
 

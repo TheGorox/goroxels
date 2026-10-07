@@ -3,7 +3,7 @@ import { screenToBoardSpace } from '../utils/camera.js';
 import { clamp } from '../utils/math.js';
 
 const zoomLevels = [
-    1/64, 1/32, 1/16, 1/8, 1/4, 1/2, 1,
+    1 / 64, 1 / 32, 1 / 16, 1 / 8, 1 / 4, 1 / 2, 1,
     1.25, 1.5, 2, 4, 6, 8,
     10, 12, 16, 20, 25, 32, 40, 50, 64
 ];
@@ -52,7 +52,7 @@ class MoverTool {
     }
 
     onDown(e = null, isConsumed) {
-        if(isConsumed) return;
+        if (isConsumed) return;
 
         this.mousedown = true;
         this.isActive = true;
@@ -60,7 +60,7 @@ class MoverTool {
     }
 
     onUp(e = null, isConsumed) {
-        if(isConsumed) return;
+        if (isConsumed) return;
 
         this.mousedown = false;
         this.isActive = false;
@@ -76,7 +76,7 @@ class MoverTool {
         camera.updateMouse(e.clientX, e.clientY);
     }
 
-    onpointerdrag(e, isConsumedMode=false) {
+    onpointerdrag(e, isConsumedMode = false) {
         if (!this.core || !isConsumedMode && !this.mousedown) return;
 
         const camera = this.core.camera;
@@ -88,37 +88,54 @@ class MoverTool {
 
     onpointerpinch(e) {
         if (!this.core) return;
+
         const camera = this.core.camera;
-        const canvas = this.core.mainCanvas;
-        
+
         camera.x -= e.dx / camera.currentZoom;
         camera.y -= e.dy / camera.currentZoom;
-        
-        const [centerWorldX, centerWorldY] = screenToBoardSpace(e.centerX, e.centerY);
-        
-        camera.currentZoom *= e.ds;
+
+        const [beforeX, beforeY] = screenToBoardSpace(e.centerX, e.centerY);
+
+        camera.currentZoom = clamp(camera.currentZoom * e.ds, 0.1, 64);
         camera.targetZoom = camera.currentZoom;
-        
-        camera.x = centerWorldX - (e.centerX - canvas.clientWidth / 2) / camera.currentZoom;
-        camera.y = centerWorldY - (e.centerY - canvas.clientHeight / 2) / camera.currentZoom;
+
+        const [afterX, afterY] = screenToBoardSpace(e.centerX, e.centerY);
+
+        camera.x += beforeX - afterX;
+        camera.y += beforeY - afterY;
     }
-    
+
     onwheel(e) {
         if (!this.core) return;
-        const camera = this.core.camera;
 
-        const closestZoom = getNearestZoomLevel(camera.targetZoom);
-        const closestZoomIdx = zoomLevels.indexOf(closestZoom);
+        const isLaptop = e.ctrlKey;
 
-        const scrollingUp = e.deltaY < 0;
-        const newZoomLevelIdx = clamp(closestZoomIdx + (scrollingUp ? 1 : -1), 0, zoomLevels.length - 1);
+        if (isLaptop) {
+            const TOUCHPAD_ZOOM_FACTOR = 0.008;
+            const event = {
+                dx: 0,
+                dy: 0,
+                ds: Math.exp(-e.deltaY * TOUCHPAD_ZOOM_FACTOR),
+                centerX: e.clientX,
+                centerY: e.clientY
+            }
+            this.onpointerpinch(event);
+        } else {
+            const camera = this.core.camera;
 
-        this.updateMousePos(e);
-        camera.targetZoom = zoomLevels[newZoomLevelIdx];
+            const closestZoom = getNearestZoomLevel(camera.targetZoom);
+            const closestZoomIdx = zoomLevels.indexOf(closestZoom);
+
+            const scrollingUp = e.deltaY < 0;
+            const newZoomLevelIdx = clamp(closestZoomIdx + (scrollingUp ? 1 : -1), 0, zoomLevels.length - 1);
+
+            this.updateMousePos(e);
+            camera.targetZoom = zoomLevels[newZoomLevelIdx];
+        }
     }
 
     isLongTap() {
-        return Date.now() - this.downTime > 600; 
+        return Date.now() - this.downTime > 600;
     }
 }
 

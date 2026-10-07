@@ -7,6 +7,7 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"build:dev": "vite build --mode development && npm run postbuild",
+		"build:watch": "vite build --mode development --watch",
 		"postbuild": "cpy \"build/**/*\" ../server/public --parents --clean",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
