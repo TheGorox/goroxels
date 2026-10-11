@@ -19,16 +19,6 @@ const template = require('./template');
 const { router: stickers } = require('./stickers');
 
 const router = express.Router();
-
-router.use(bodyParser.json());
-
-router.use('/chunks', chunks);
-
-router.use(session);
-
-router.use(passport.initialize());
-router.use(passport.session());
-
 router.use((req, res, next) => {
     res.error = function (error) {
         res.json({
@@ -39,6 +29,16 @@ router.use((req, res, next) => {
 
     next();
 });
+
+router.use(bodyParser.json());
+
+router.use('/chunks', chunks);
+
+router.use(session);
+
+router.use(passport.initialize());
+router.use(passport.session());
+
 
 
 router.use('/radio', radio);

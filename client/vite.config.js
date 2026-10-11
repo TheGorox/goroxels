@@ -62,7 +62,8 @@ export default defineConfig(({ mode }) => {
 			},
 			host: '0.0.0.0', // allow lan connections
 			port: 5173,
-			proxy
+			proxy,
+			hmr: false
 		},
 		build: {
 			minify: mode === 'development' ? false : 'esbuild',

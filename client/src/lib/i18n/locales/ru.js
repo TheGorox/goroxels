@@ -42,7 +42,13 @@ export default {
         general: 'общий',
     },
     errors: {
-        'genericApi': 'Ошибка API:  {msg}'
+        'genericApi': 'Ошибка API:  {msg}',
+        socket: {
+            defaultError: 'Неизвестная ошибка подключения',
+            invalid_canvas: 'Выбрано несуществующее полотно',
+            rate_limit: 'Слишком много подключений. Закройте лишние вкладки',
+            banned: 'Ваш аккаунт заблокирован ещё на {datetime}',
+        }
     },
 
 }

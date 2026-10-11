@@ -82,7 +82,7 @@ router.get('/',
                 id: targetUserId
             }
         });
-        if (!user) return error(res, 'no such user');
+        if (!user) return res.error('no such user');
 
         if(!canBan(req.user, user)){
             return res.error('Не по Сеньке шапка, или же другими словами иди нахуй');

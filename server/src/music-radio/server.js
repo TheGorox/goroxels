@@ -3,10 +3,10 @@ require('../dotenv');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const os = require('os');
 const Song = require('../db/models/Song');
 const { Op } = require('sequelize');
 const { ffprobe_getAudioInfo, getHash, addMp3, getSongStream, delMp3 } = require('./audio');
-const Throttle = require('throttle');
 const EventEmitter = require('events');
 const { SongExistsError, SongNotExistError, spawnWithPipe } = require('./util');
 const Server = require('../WebsocketServer');
@@ -116,7 +116,6 @@ function killFfmpeg(proc) {
     proc.removeAllListeners('error');
 
     proc.stdout.end();
-
 
     if (os.platform() === 'win32') {
         if (proc.stdin && !proc.stdin.destroyed) {

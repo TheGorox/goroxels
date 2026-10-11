@@ -1,3 +1,4 @@
+const { ROLE } = require("../constants");
 const logger = require("./logger");
 const { checkRole } = require("./role");
 
@@ -6,7 +7,7 @@ function checkCanvasConditions(user, condition) {
         reqName = splitted[0],
         reqArgs = splitted.slice(1);
 
-    if(checkRole(user, 'ADMIN')) return true;
+    if(checkRole(user, ROLE.ADMIN)) return true;
 
     switch (reqName) {
         case 'user':

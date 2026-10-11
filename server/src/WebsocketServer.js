@@ -1,5 +1,3 @@
-const zlib = require('zlib');
-
 const WebSocket = require('ws');
 const { Server: WebSocketServer } = require('ws');
 
@@ -7,7 +5,7 @@ const logger = require('./logger')('WEBSOCKET', 'debug');
 const config = require('./config');
 
 const { MAX_CLIENTS_PER_IP } = require('./config');
-const { ROLE, ROLE_I, MINUTE, chatBucket } = require('./constants');
+const { ROLE, chatBucket } = require('./constants');
 
 const { Client } = require('./Client');
 const Bucket = require('../../shared/classes/Bucket.js').default;
@@ -84,7 +82,7 @@ class Server {
         setInterval(this.updateOnlineStats.bind(this), 10000);
     }
 
-    verifyClient(request, socket) {
+    verifyClient(socket) {
         const ip = socket.realIp;
         if (this.connections['TOTAL'][ip] && this.connections['TOTAL'][ip] > 50)
             return false
@@ -372,7 +370,7 @@ class Server {
                             return;
                         }
 
-                        if (broadcastQueue.curOffset + outSize >= broadcastQueue.byteLength) {
+                        if (broadcastQueue.curOffset + outSize >= broadcastQueue.buffer.byteLength) {
                             this.flushPixelQueue(clientCanvas);
                             client.weirds += 0.5;
                         }
@@ -700,7 +698,7 @@ class Server {
             }
             // temporary
             case 'transmit': {
-                if (!client.user.isApiSocket) return;
+                if (!client.user?.isApiSocket) return;
 
                 this.broadcastString(JSON.stringify(msg), c => c.canvas.id === msg.canvas);
                 break;
@@ -708,7 +706,7 @@ class Server {
         }
     }
 
-    broadcastRect(rect, canvas) {
+    broadcastRect() {
 
     }
 

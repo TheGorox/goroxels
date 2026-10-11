@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 
-function terminateWsWithMessage(socket, code, message){
+function terminateWsWithMessage(request, code, message){
+    const socket = request.socket;
     const reasonText = message; // up to 123 bytes
 
     const secWsAccept = crypto

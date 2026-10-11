@@ -7,7 +7,7 @@ if(process.env.DEV){
 
 
 const config = {
-    port: 8000,
+    port: 80,
     MAX_CLIENTS_PER_IP: {
         GUEST: 3,
         USER: 4,

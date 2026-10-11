@@ -48,6 +48,7 @@ class Client extends EventEmitter {
         this.placeInfoNumber = 0;
 
         this.on('pong', () => {
+            this.ping();
             this.heartbeat();
         })
     }
@@ -78,6 +79,12 @@ class Client extends EventEmitter {
     sendError(message) {
         const str = JSON.stringify({ c: STRING_OPCODES.error, errors: [message] });
         this.send(str);
+    }
+
+    sendChat(from, msg, channel) {
+        const chatMessage = new ChatMessage(from, `[i]${msg}[/i]`, Date.now(), false, null, Math.random());
+        const packet = createStringPacket.chatMessage(chatMessage, channel);
+        this.send(JSON.stringify(packet));
     }
 
     sendChatWarn(from, msg, channel, isServer=false) {

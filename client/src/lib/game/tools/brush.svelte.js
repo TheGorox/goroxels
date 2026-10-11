@@ -165,7 +165,7 @@ class BrushTool {
                 }
             }
 
-            if (boardCol === this.core.config.colorsBGR[playerCol]) continue;
+            if (playerCol === -1 || boardCol === this.core.config.colorsBGR[playerCol]) continue;
 
             if (!player.bucket?.spend(1)) {
                 break;

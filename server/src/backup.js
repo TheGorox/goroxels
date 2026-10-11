@@ -108,7 +108,7 @@ async function loadPrevState(chunkManager) {
 
                 let chunk = chunks[key];
                 if(!chunk){
-                    chunk = new Chunk(cx, cy, size, curChunkData);
+                    chunk = new Chunk(cx, cy, size, curChunkData, chunkManager.canvas.id);
                     chunks[key] = chunk;
                     continue
                 }

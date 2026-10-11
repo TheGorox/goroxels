@@ -34,7 +34,8 @@ function validateCoords(x, y, canvasId) {
 const formDataMW = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fieldSize: 1048576 * 5 // 5mb
+        fieldSize: 1048576 * 5, // 5mb
+        fileSize: 1048576 * 5
     }
 });
 

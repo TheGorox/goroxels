@@ -1,7 +1,7 @@
 import { useGameCore } from "../core.svelte";
 
 export function persistent(key, initial,debounceMs = 600) {
-    console.log(key, JSON.parse(localStorage.getItem(key) ?? 'null') ?? initial, `localStorage.getItem('${key}')=`,localStorage.getItem(key) , initial);
+    // console.log(key, JSON.parse(localStorage.getItem(key) ?? 'null') ?? initial, `localStorage.getItem('${key}')=`,localStorage.getItem(key) , initial);
     
     let value = $state(
         JSON.parse(localStorage.getItem(key) ?? 'null') ?? initial
@@ -16,7 +16,6 @@ export function persistent(key, initial,debounceMs = 600) {
     
             clearTimeout(timer);
             timer = setTimeout(() => {
-                console.log('save')
                 localStorage.setItem(key, JSON.stringify(value));
             }, debounceMs);
         });

@@ -5,10 +5,10 @@ import Bucket from './utils/Bucket.js';
 class Player {
     #savedPaletteName = $state(null);
     palette = $derived.by(() => this.#savedPaletteName?.v);
-    
+
     maxPlaced = persistent('maxPlaced', 5000);
     maxActions = persistent('maxActions', 5);
-    
+
     #primaryCol = $state(null);
     primaryCol = $derived.by(() => this.#primaryCol?.v);
 
@@ -23,13 +23,13 @@ class Player {
 
     x = $state(0);
     y = $state(0);
-    suspendedClrs = $state(null);     
-    placed = $state([]);             
-    bucket = $state(null);         
+    suspendedClrs = $state(null);
+    placed = $state([]);
+    bucket = $state(null);
 
     init(config) {
         console.log('init');
-        
+
         // this.primaryCol = persistentPerCanvas('color1', -1);
         this.#primaryCol = persistentPerCanvas('color1', 0);
         this.#seconaryCol = persistentPerCanvas('color2', -1);
@@ -41,28 +41,40 @@ class Player {
             this.isGuest = !(user.registered ?? false);
         });
 
-        console.log(config.palettes);
-        this.#savedPaletteName = persistentPerCanvas('paletteName', Object.keys(config.palettes)?.[0]?.name || "");
+        const firstPaletteName = Object.keys(config.palettes)?.[0];
+        this.#savedPaletteName = persistentPerCanvas('paletteName', firstPaletteName || "");
+
+        if(this.#savedPaletteName.v === "" && firstPaletteName){
+            console.warn('fixing broken savedPaletteName');
+            this.#savedPaletteName.v = firstPaletteName;
+        }
     }
 
-    setPalette(newPal){
+    setPalette(newPal) {
         this.#savedPaletteName.v = newPal;
     }
 
-    setPrimaryColor(id){
-        console.log(this);
-        this.#primaryCol.v = id;
+    setPrimaryColor(id) {
+        if (this.#primaryCol.v === id) {
+            this.#primaryCol.v = -1;
+        } else {
+            this.#primaryCol.v = id;
+        }
     }
 
-    setSeconaryColor(id){
-        this.#seconaryCol.v = id;
+    setSeconaryColor(id) {
+        if (this.#seconaryCol.v === id) {
+            this.#seconaryCol.v = -1;
+        } else {
+            this.#seconaryCol.v = id;
+        }
     }
 
-    
-    getColorByCoord(x, y){
+
+    getColorByCoord(x, y) {
         let col1 = player.primaryCol ?? -1;
         let col2 = player.seconaryCol ?? -1;
-        
+
         if (col1 === -1 && col2 !== -1) {
             col1 = col2;
         } else if (col2 === -1 && col1 !== -1) {
@@ -70,10 +82,10 @@ class Player {
         } else if (col1 === -1 && col2 === -1) {
             return -1;
         }
-        
+
         return ((x + y) % 2) === 0 ? col1 : col2;
     }
-    
+
     switchColor(id) {
         if (!this.primaryCol || !this.seconaryCol) return;
 
@@ -111,7 +123,7 @@ class Player {
 
     restoreColors() {
         if (!this.suspendedClrs) return;
-        
+
         this.switchColor(this.suspendedClrs[0]);
         this.switchSecondColor(this.suspendedClrs[1]);
         this.suspendedClrs = null;

@@ -359,6 +359,7 @@ export function initChunkManager(core) {
         handleInputPixels,
         getChunk,
         setPixels,
-        getPixel
+        getPixel,
+        reloadChunks
     }
 }

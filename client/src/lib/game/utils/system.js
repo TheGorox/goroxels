@@ -22,3 +22,22 @@ export function getPathsafeDate() {
 
     return `${today} - ${time}`
 }
+
+export function startWorker(jsCodeStr, onMessage = null) {
+    const workerCode = jsCodeStr;
+
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+
+
+    if(onMessage){
+        worker.onmessage = onMessage;
+    }
+
+    return {
+        worker,
+        terminate: () => {
+            worker.terminate();
+        }
+    }
+}

@@ -28,7 +28,7 @@ Sticker.belongsTo(StickerPack, { foreignKey: 'packId', as: 'pack' });
 async function initModels() {
     if (sequelize.getDialect() === 'sqlite') {
         await sequelize.query('PRAGMA foreign_keys = OFF;');
-        await sequelize.sync({ force: true });
+        await sequelize.sync();
         await sequelize.query('PRAGMA foreign_keys = ON;');
     }else{
         await sequelize.query('SET FOREIGN_KEY_CHECKS = 0;');

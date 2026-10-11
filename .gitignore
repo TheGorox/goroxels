@@ -5,3 +5,4 @@ client/repomix-output.xml
 .env
 .env.*
 !.env.example
+client/src/repomix-output.xml

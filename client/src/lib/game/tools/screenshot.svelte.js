@@ -9,7 +9,7 @@ class ScreenshotTool {
     core = null;
     name = 'screenshot';
     icon = screenshotIcon;
-    keybind = 'KeyS';
+    keybind = null;
     showOnPanel = false;
     isBackground = false;
 
@@ -141,10 +141,12 @@ class ScreenshotTool {
         ctx.strokeStyle = this.cachedStrokeColor;
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 4]);
+        // marching ants animation
+        ctx.lineDashOffset = Math.floor((performance.now() * 0.03) % 11);
         ctx.strokeRect(startX, startY, endX - startX, endY - startY);
         ctx.setLineDash([]);
 
-        return FX_STATE.FINISHED;
+        return FX_STATE.IN_PROCESS;
     }
 
     doScreenshot() {

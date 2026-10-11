@@ -20,7 +20,6 @@ const fs = require('fs');
 
 const config = require('./config');
 const { STRING_OPCODES } = require('./protocol');
-const ms = require('ms');
 const { DAY } = require('./constants');
 const { patchIndex } = require('./ssr');
 const indexWatcher = require('./indexWatcher');
@@ -43,6 +42,8 @@ indexWatcher({
 
 const stickersPath = path.resolve(__dirname, '../data/stickers');
 
+
+
 function startServer(port) {
     ///// HTTP
     const app = express();
@@ -56,20 +57,20 @@ function startServer(port) {
         cert = fs.readFileSync(process.env.SSL_CERT, 'utf-8');
         httpsOptions.key = key;
         httpsOptions.cert = cert;
-
+        
         httpServer = https;
         port = 443;
         logger.warn(`port was changed to 443 since ssl key/cert found!`)
     } catch {
         logger.warn('Unable to load ssl key/cert')
     }
-
+    
     const server = httpServer.createServer(httpsOptions, app);
-
+    
     app.use(compression({
         level: 3
     }))
-
+    
     app.use((req, res, next) => {
         req.realIp = getIPv6Subnet(getIPFromRequest(req));
         next();
@@ -80,34 +81,34 @@ function startServer(port) {
             return format(`${req.user ? req.user.name.replace(/:/g, ';') : 'null'} at ${req.realIp} - :method :url len(:content-length)`)
         }
     }));
-
+    
     app.use('/config.json', (req, res) => {
         res.header('Cache-Control', 'no-cache');
         res.json(config.public);
     })
-
+    
     app.use('/robots.txt', (req, res) => {
         res.sendFile(path.join(__dirname, '../data/robots.txt'));
     })
-
+    
     const changelogPath = path.join(__dirname, '../data/CHANGELOG');
-
+    
     app.get('/changelog', (req, res) => {
         res.setHeader('Content-Type', 'text/plain');
         res.sendFile(changelogPath);
     })
-
+    
     app.use('/api', api);
-
+    
     // enables coop/coep headers to make worker's SharedArrayBuffer work
     app.use((req, res, next) => {
         res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
         res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
         next();
     });
-
+    
     const publicDir = path.join(__dirname, '/../public');
-
+    
     app.get('/convert/:filename', (req, res) => {
         res.sendFile(req.params.filename, {
             root: publicDir,
@@ -118,11 +119,11 @@ function startServer(port) {
             }
         });
     });
-
+    
     app.get('/convert', (req, res) => {
         res.sendFile('convert.html', { root: publicDir });
     });
-
+    
     app.get('/admin/:filename', (req, res) => {
         res.sendFile(req.params.filename, {
             root: publicDir,
@@ -133,11 +134,11 @@ function startServer(port) {
             }
         });
     });
-
+    
     app.get('/admin', (req, res) => {
         res.sendFile('admin.html', { root: publicDir });
     });
-
+    
     app.get('/radio/:filename', (req, res) => {
         res.sendFile(req.params.filename, {
             root: publicDir,
@@ -148,11 +149,11 @@ function startServer(port) {
             }
         });
     });
-
+    
     app.get('/radio', (req, res) => {
         res.sendFile('radio.html', { root: publicDir });
     });
-
+    
     app.use(
         '/uploads/stickers',
         express.static(stickersPath, {
@@ -163,68 +164,73 @@ function startServer(port) {
             fallthrough: true,
         })
     );
-
+    
     app.use(express.static(publicDir, { index: false }));
     app.use(/\/[\d\w]{0,32}/, express.static(publicDir, { index: false }));
-
+    
     const webSocketServer = new Socket();
-
-
+    
+    
     port = process.env.EXPRESS_PORT || port;
     logger.info('Listening http + websocket on port ' + port);
     server.listen(port);
-
+    
     ///// WS
     webSocketServer.run(server);
     const wss = webSocketServer.wss;
+    let fb = Date.now() + 100000;
     server.on('upgrade', async (request, socket, head) => {
+        console.log(request.socket === socket);
         if (!global.canvases) {
             logger.warn('No canvases loaded yet, rejecting socket');
-            terminateWsWithMessage(socket, CLOSE_CODES.SERVER_ERROR, 'not_initialized');
+            terminateWsWithMessage(request, CLOSE_CODES.SERVER_ERROR, 'not_initialized');
             return;
         }
-
+        
         socket.setTimeout(3000); // "slowloris protection", will be cleared on successful connection
         socket.realIp = getIPv6Subnet(getIPFromRequest(request));
-
+        
         const requestedCanvasName = request.url.split('/')[1];
         const requestedCanvas = global.canvases?.find(c => c.name === requestedCanvasName);
-
+        
+        
         if (!requestedCanvas) {
-            terminateWsWithMessage(socket, CLOSE_CODES.CLIENT_ERROR, 'invalid_canvas');
+            terminateWsWithMessage(request, CLOSE_CODES.CLIENT_ERROR, 'invalid_canvas');
             return;
         }
-
+        
         let user;
-
+        
         if (request.headers.authorization) {
             if (request.headers.authorization !== `Bearer ${APIKEY}`)
                 return logger.warn(`${socket.realIp} tried to connect apisocket`);
-
+            
             user = {
                 id: 0,
                 role: 'ADMIN',
                 isApiSocket: true
             }
+            
+            socket.destroy();
         } else {
             if (!webSocketServer.verifyClient(request, socket)) {
-                terminateWsWithMessage(socket, CLOSE_CODES.CLIENT_ERROR, 'rate_limit');
+                terminateWsWithMessage(request, CLOSE_CODES.CLIENT_ERROR, 'rate_limit');
                 return
             }
             user = await verifyUser(request);
-
+            
             if (user?.role === 'BANNED') {
                 let msg;
-                if (client.user.bannedUntil) {
-                    const timeLeft = Math.max(client.user.bannedUntil - Date.now(), 0);
-                    msg = `bannedUntil:${ms(timeLeft)}`;
+                if (user.bannedUntil) {
+                    const timeLeft = Math.max(user.bannedUntil - Date.now(), 0);
+                    msg = `bannedUntil:${timeLeft}`;
                 }
                 else
                     msg = 'bannedUntil:permament';
-                terminateWsWithMessage(socket, CLOSE_CODES.BANNED, msg);
+                terminateWsWithMessage(request, CLOSE_CODES.BANNED, msg);
                 return;
             }
-
+            
             if (!user || user.role === 'USER') {
                 // will defer socket closing if proxy isn't cached
                 const isBanned = proxyCheck(socket.realIp, () => {
@@ -234,15 +240,15 @@ function startServer(port) {
                         }
                     })
                 });
-
+                
                 if (isBanned) {
                     const until = expiresFromCache(socket.realIp);
-                    const untilFormatted = ms(Math.max(until - Date.now(), 0));
-                    terminateWsWithMessage(socket, CLOSE_CODES.BANNED, 'bannedUntil:' + untilFormatted);
+                    const timeLeft = Math.max(until - Date.now(), 0);
+                    terminateWsWithMessage(request, CLOSE_CODES.BANNED, 'bannedUntil:' + timeLeft);
                     return;
                 }
             }
-
+            
         }
 
         if (requestedCanvas.require && !checkCanvasConditions(user, requestedCanvas.require)) {
@@ -250,16 +256,16 @@ function startServer(port) {
             socket.destroy();
             return;
         }
-
+        
         logger.debug('Going to upgrade ip ' + socket.realIp + ' with user ' + (user ? user.name : null));
-
+        
         wss.handleUpgrade(request, socket, head, function done(ws) {
             socket.setTimeout(30000);
-
+            
             wss.emit('connection', ws, request, user, requestedCanvas);
         });
     });
-
+    
     // SPA fallback for SSR
     app.get('*', (req, res) => {
         const patched = patchIndex(indexTemplate, req.headers['accept-language']);
@@ -270,3 +276,6 @@ function startServer(port) {
 module.exports = {
     startServer
 }
+
+process.on('unhandledRejection', e => logger.error('unhandledRejection', e));
+process.on('uncaughtException',  e => logger.error('uncaughtException', e));
