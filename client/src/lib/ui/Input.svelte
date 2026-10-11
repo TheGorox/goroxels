@@ -107,7 +107,7 @@
 		style:--placeholder-color={placeholderColor}
 	/>
 	<div class="childrenContainer">
-		{@render children()}
+		{@render children?.()}
 	</div>
 </div>
 

@@ -1,5 +1,5 @@
 <script>
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { t } from '../../i18n/translate.svelte';
 	import { useGameCore } from '../../game/core.svelte';
 	import Button from '../../ui/Button.svelte';
@@ -14,38 +14,45 @@
 
 	const core = useGameCore();
 
-	const tool = core.toolManager.tools['screenshot'];
+	
+	const screenshotTool = core.toolManager.tools['screenshot'];
 
 	const boundsAlias = ['startX', 'startY', 'endX', 'endY'];
 
-	core.toolManager.selectTool(tool);
+	core.toolManager.selectTool(screenshotTool);
 
 	onDestroy(() => {
-		tool.onDeselected();
-		if (core.toolManager.currentTool === tool) {
+		screenshotTool.onDeselected();
+		if (core.toolManager.currentTool === screenshotTool) {
 			core.toolManager.selectTool(defaultTool);
 		}
 	});
 
 	function onSelectClick() {
-		tool.startSelection();
+		screenshotTool.startSelection();
 	}
 
 	function handleTakeScreenshot() {
-		tool.doScreenshot();
+		screenshotTool.doScreenshot();
 	}
 
 	const pref = 'w.screenshot';
+
+	onMount(() => {
+		return () => {
+
+		}
+	})
 </script>
 
 <Window title={t(`${pref}.title`)} id="screenshot" bind:isOpen {...rprops}>
 	<div class="panelRow">
-		{#each tool.bounds as coordinate, i}
+		{#each screenshotTool.bounds as coordinate, i}
 			<Legendary legend={t(`${pref}.${boundsAlias[i]}`)}>
 				<Input 
 					type="number" 
 					draggable={true} 
-					bind:bindValue={tool.bounds[i]} 
+					bind:bindValue={screenshotTool.bounds[i]} 
 				/>
 			</Legendary>
 		{/each}
@@ -53,14 +60,14 @@
 	<hr>
 	<div class="panelRow" style="justify-content: space-between;">
 		<div class="panelRow">
-			<Button icon={screenshotIcon} isActive={tool.isSelecting} onclick={onSelectClick}></Button>
-			<Button onclick={() => tool.expandBoundsFullCanvas()}>{t(`${pref}.wholeCanvas`)}</Button>
-			<Button onclick={() => tool.expandBoundsFullScreen()}>{t(`${pref}.visibleArea`)}</Button>
+			<Button icon={screenshotIcon} isActive={screenshotTool.isSelecting} onclick={onSelectClick}></Button>
+			<Button onclick={() => screenshotTool.expandBoundsFullCanvas()}>{t(`${pref}.wholeCanvas`)}</Button>
+			<Button onclick={() => screenshotTool.expandBoundsFullScreen()}>{t(`${pref}.visibleArea`)}</Button>
 		</div>
 		<div class="panelRow">
 			<Button 
 				onclick={handleTakeScreenshot}
-				disabled={tool.bounds[0] === -1 || tool.isSelecting}
+				disabled={screenshotTool.bounds[0] === -1 || screenshotTool.isSelecting}
 			>
 				{t(`${pref}.doScreenshot`)}
 			</Button>

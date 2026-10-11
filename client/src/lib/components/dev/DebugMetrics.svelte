@@ -61,7 +61,7 @@
             <span class="value">{memory.used} / {memory.total} MB</span>
         </div>
     {/if}
-    <hr>
+    <hr style="width: stretch;">
     <div class="metric">
         <span class="label">Bucket:</span>
         <span class="value">{statedBucketAllowance}</span>

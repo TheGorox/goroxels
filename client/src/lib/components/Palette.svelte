@@ -13,6 +13,7 @@
 		if (!allColors) return null;
 
 		const paletteSlice = core.config.palettes[player.palette] || [];
+		
 		if (!paletteSlice) return null;
 
 		const left = paletteSlice[0] ?? 0;
@@ -21,9 +22,11 @@
 		return allColors.slice(left, right);
 	});
 
-	const firstColorHex = $derived(core?.config.colorsHex?.[player.primaryCol]);
-	const secondColorHex = $derived(core?.config.colorsHex?.[player.seconaryCol] || firstColorHex);
-	$inspect(firstColorHex);
+	const getColor1Hex = ()=>core?.config.colorsHex?.[player.primaryCol];
+	const getColor2Hex = ()=>core?.config.colorsHex?.[player.seconaryCol];
+
+	const firstColorHex = $derived(getColor1Hex() ?? getColor2Hex());
+	const secondColorHex = $derived(getColor2Hex() ?? getColor1Hex());
 
 	function colorClicked(e, id) {
 		const isLeftClick = e.button === 0;
