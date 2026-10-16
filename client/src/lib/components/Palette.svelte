@@ -13,7 +13,8 @@
 		if (!allColors) return null;
 
 		const paletteSlice = core.config.palettes[player.palette] || [];
-		
+		console.log({ paletteSlice });
+
 		if (!paletteSlice) return null;
 
 		const left = paletteSlice[0] ?? 0;
@@ -22,8 +23,8 @@
 		return allColors.slice(left, right);
 	});
 
-	const getColor1Hex = ()=>core?.config.colorsHex?.[player.primaryCol];
-	const getColor2Hex = ()=>core?.config.colorsHex?.[player.seconaryCol];
+	const getColor1Hex = () => core?.config.colorsHex?.[player.primaryCol];
+	const getColor2Hex = () => core?.config.colorsHex?.[player.seconaryCol];
 
 	const firstColorHex = $derived(getColor1Hex() ?? getColor2Hex());
 	const secondColorHex = $derived(getColor2Hex() ?? getColor1Hex());
@@ -47,6 +48,8 @@
 
 		player.setSeconaryColor(id);
 	}
+
+	$inspect(core.config?.palettes);
 </script>
 
 <div class="container" style:bottom="{bottom}px" style:right="{right}px">
@@ -62,13 +65,27 @@
 			<div
 				class="colorSwatch"
 				style:background-color={color}
-                class:primaryColor={player.primaryCol === index}
-                class:seconaryColor={player.seconaryCol === index}
+				class:primaryColor={player.primaryCol === index}
+				class:seconaryColor={player.seconaryCol === index}
 				onclick={(e) => colorClicked(e, index)}
 				oncontextmenu={(e) => colorContextmenu(e, index)}
 			></div>
 		{/each}
 	</div>
+	{#each Object.keys(core.config?.palettes) as paletteName, i}
+		{@const selected = paletteName === player.palette}
+
+		<div
+			class="paletteBadge"
+			style:top={`${45 + i * (30 + 5)}px`}
+			style:width={selected ? '' : '20px'}
+			onclick={() => (player.palette = paletteName)}
+		>
+			<div>
+				{selected ? paletteName : i + 1}
+			</div>
+		</div>
+	{/each}
 </div>
 
 <style>
@@ -102,35 +119,35 @@
 	}
 
 	.colorSwatch {
-		width: 34px;
-		height: 34px;
-		box-sizing: border-box;
-		border-right: 2px solid black;
-		border-bottom: 2px solid black;
-        position: relative;
-	}
+	width: 34px;
+	height: 34px;
+	box-sizing: border-box;
+	border-right: 2px solid black;
+	border-bottom: 2px solid black;
+	position: relative;
+}
 
-    .colorSwatch.primaryColor::after {
-        content: '';
-        position: absolute;
-        width: 16px;
-        height: 16px;
-        background: #000;
-        top: 0;
-        left: 0;
-        clip-path: polygon(100% 0, 0 0, 0 100%)
-    }
+.colorSwatch.primaryColor::after {
+	content: '';
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	background: #000;
+	top: 0;
+	left: 0;
+	clip-path: polygon(100% 0, 0 0, 0 100%);
+}
 
-    .colorSwatch.seconaryColor:not(.colorSwatch.primaryColor)::after {
-        content: '';
-        position: absolute;
-        width: 16px;
-        height: 16px;
-        background: #000;
-        right: 0;
-        bottom: 0;
-        clip-path: polygon(100% 0, 100% 100%, 0 100%);
-    }
+.colorSwatch.seconaryColor::before {
+	content: '';
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	background: #000;
+	right: 0;
+	bottom: 0;
+	clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
 
 	.colorsDisplayContainer {
 		display: flex;
@@ -149,4 +166,37 @@
 		border-right: 2px solid black;
 	}
 
+	.paletteBadge {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100px;
+		height: 30px;
+		background: var(--bg-mid);
+		color: var(--accent);
+
+		transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+
+		padding: 2px;
+
+		border-top-left-radius: 5px;
+		border-bottom-left-radius: 5px;
+
+		/* Чтобы рос влево - используем transform или отрицательный margin */
+		transform: translateX(-100%);
+
+		cursor: pointer;
+
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+
+	.paletteBadge > div {
+		width: auto;
+		text-align: center;
+		text-overflow: clip;
+		white-space: nowrap;
+		overflow: hidden;
+	}
 </style>
