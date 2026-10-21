@@ -6,3 +6,4 @@ client/repomix-output.xml
 .env.*
 !.env.example
 client/src/repomix-output.xml
+server/src/db/config/config.json

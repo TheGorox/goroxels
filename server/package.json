@@ -63,7 +63,7 @@
   },
   "devDependencies": {
     "fs-extra": "^8.1.0",
-    "sequelize-cli": "^6.6.3",
+    "sequelize-cli": "^6.6.5",
     "sqlite3": "^5.0.0"
   },
   "allowScripts": {

@@ -17,7 +17,7 @@ const config = {
 	},
 	compilerOptions: {
 		// disable a11y warnings - they're not applicable for this app
-		warningFilter: (warning) => !warning.code.startsWith('a11y-')
+		warningFilter: (warning) => !warning.code.startsWith('a11y_')
 	}
 };
 

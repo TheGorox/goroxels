@@ -47,6 +47,7 @@
 	import { notify } from '../toast.js';
 	import { t } from '../i18n/translate.svelte.js';
 	import { attachProtectionFx } from './fx/shaders/protection.svelte.js';
+	import Templates from '../components/Templates.svelte';
 
 	// loading config is the first thing we want to do
 	// anything else can be done after mount
@@ -237,6 +238,7 @@
 	<CoordsMenu />
 	<DebugMetrics />
     <Palette bottom={60} right={10} />
+    <Templates />
 </div>
 
 <Toast />

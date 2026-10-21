@@ -8,20 +8,26 @@
 
 	const core = useGameCore();
 
+	const currentPaletteSlice = $derived(core?.config?.palettes[player.palette] || []);
+	$inspect(currentPaletteSlice);
+
 	const currentColors = $derived.by(() => {
 		const allColors = core?.config?.colorsHex;
 		if (!allColors) return null;
 
-		const paletteSlice = core.config.palettes[player.palette] || [];
-		console.log({ paletteSlice });
+		console.log({ currentPaletteSlice });
 
-		if (!paletteSlice) return null;
+		if (!currentPaletteSlice) return null;
 
-		const left = paletteSlice[0] ?? 0;
-		const right = paletteSlice[1] ?? allColors.length;
+		const leftIdx = currentPaletteSlice[0] ?? 0;
+		const rightIdx = currentPaletteSlice[1] ?? allColors.length;
 
-		return allColors.slice(left, right);
+		return allColors.slice(leftIdx, rightIdx).map((color, i) => ({
+			colorId: leftIdx + i,
+            color
+		}));
 	});
+    $inspect(currentColors)
 
 	const getColor1Hex = () => core?.config.colorsHex?.[player.primaryCol];
 	const getColor2Hex = () => core?.config.colorsHex?.[player.seconaryCol];
@@ -48,8 +54,6 @@
 
 		player.setSeconaryColor(id);
 	}
-
-	$inspect(core.config?.palettes);
 </script>
 
 <div class="container" style:bottom="{bottom}px" style:right="{right}px">
@@ -61,14 +65,14 @@
 		<div style:background-color={secondColorHex}></div>
 	</div>
 	<div class="paletteContainer">
-		{#each currentColors as color, index}
+		{#each currentColors as {color, colorId}, index}
 			<div
 				class="colorSwatch"
 				style:background-color={color}
-				class:primaryColor={player.primaryCol === index}
-				class:seconaryColor={player.seconaryCol === index}
-				onclick={(e) => colorClicked(e, index)}
-				oncontextmenu={(e) => colorContextmenu(e, index)}
+				class:primaryColor={player.primaryCol === colorId}
+				class:seconaryColor={player.seconaryCol === colorId}
+				onclick={(e) => colorClicked(e, colorId)}
+				oncontextmenu={(e) => colorContextmenu(e, colorId)}
 			></div>
 		{/each}
 	</div>
@@ -119,35 +123,35 @@
 	}
 
 	.colorSwatch {
-	width: 34px;
-	height: 34px;
-	box-sizing: border-box;
-	border-right: 2px solid black;
-	border-bottom: 2px solid black;
-	position: relative;
-}
+		width: 34px;
+		height: 34px;
+		box-sizing: border-box;
+		border-right: 2px solid black;
+		border-bottom: 2px solid black;
+		position: relative;
+	}
 
-.colorSwatch.primaryColor::after {
-	content: '';
-	position: absolute;
-	width: 16px;
-	height: 16px;
-	background: #000;
-	top: 0;
-	left: 0;
-	clip-path: polygon(100% 0, 0 0, 0 100%);
-}
+	.colorSwatch.primaryColor::after {
+		content: '';
+		position: absolute;
+		width: 16px;
+		height: 16px;
+		background: #000;
+		top: 0;
+		left: 0;
+		clip-path: polygon(100% 0, 0 0, 0 100%);
+	}
 
-.colorSwatch.seconaryColor::before {
-	content: '';
-	position: absolute;
-	width: 16px;
-	height: 16px;
-	background: #000;
-	right: 0;
-	bottom: 0;
-	clip-path: polygon(100% 0, 100% 100%, 0 100%);
-}
+	.colorSwatch.seconaryColor::before {
+		content: '';
+		position: absolute;
+		width: 16px;
+		height: 16px;
+		background: #000;
+		right: 0;
+		bottom: 0;
+		clip-path: polygon(100% 0, 100% 100%, 0 100%);
+	}
 
 	.colorsDisplayContainer {
 		display: flex;
@@ -182,7 +186,6 @@
 		border-top-left-radius: 5px;
 		border-bottom-left-radius: 5px;
 
-		/* Чтобы рос влево - используем transform или отрицательный margin */
 		transform: translateX(-100%);
 
 		cursor: pointer;
